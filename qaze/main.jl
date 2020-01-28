@@ -51,5 +51,6 @@ end
 
 config = TOML.parsefile("config.toml")
 wind = initialize(config)
-value = tau_x(10, 250, wind)
-println(value)
+
+fm = force_multiplier(1e-6, 1e-10)
+println(fm)

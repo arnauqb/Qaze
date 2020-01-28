@@ -56,6 +56,7 @@ function integrate_z_kernel(x, r, z, wind::Wind)
     r_part = nt / r_d^2 * f_uv * mdot 
     return r_part * phi_part
 end
+
 function integrate_z(r, z, wind::Wind)
     xmin = (wind.config["disk"]["inner_radius"], 0.)
     xmax = (wind.config["disk"]["outer_radius"], pi)
@@ -128,6 +129,44 @@ function tau_x(r, z, wind::Wind)
     d = sqrt(r^2 + z^2) * wind.bh.R_g
     tau =  tau / tau_length *  SIGMA_T * d
     return tau
+end
+
+function ionization_parameter(r, z, density, wind::Wind)
+    d2 = (r^2 + z^2) * wind.bh.R_g^2
+    tau_x = tau_x(r,z,wind)
+    xi = wind.radiation.xray_luminosity * exp(-tau_x) / (density * d2)
+    return xi
+end
+
+function force_multiplier_k(xi)
+    k = 0.03 + 0.385 * exp(-1.4 * xi^0.6)
+    return k
+end
+
+function force_multiplier_eta(xi)
+    if (log10(xi) < 0.5)
+        aux = 6.9 * exp(0.16 * xi^0.4)
+        eta_max = 10^aux
+    else
+        aux = 9.1 * exp(-7.96e-3 * xi)
+        eta_max = 10^aux
+    end
+end
+
+function force_multiplier(t, xi)
+    ALPHA = 0.6
+    TAU_MAX_TOL = 1e-3
+    k = force_multiplier_k(xi)
+    eta = force_multiplier_eta(xi)
+    tau_max = t * eta
+    if tau_max < TAU_MAX_TOL
+        aux = (1 - ALPHA) * (tau_max^ALPHA)
+    else
+        aux = ((1 + tau_max)^(1-ALPHA) - 1) / ((tau_max)^(1-ALPHA))
+    end
+    fm = k * t^(-ALPHA) * aux
+    @assert fm >= 0
+    return fm
 end
 
 
