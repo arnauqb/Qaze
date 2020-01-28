@@ -1,40 +1,27 @@
-using ConfParser
+using TOML
 include("constants.jl")
+include("structures.jl")
 include("black_hole.jl")
-include("grid.jl")
-struct Wind
-    bh::BlackHole
-    grids::Grids
-end
-function readconfig(config_file::String)
-    config = Dict()
-    conf = ConfParse(config_file)
-    parse_conf!(conf)
-    config["general"] = retrieve(conf, "general")
-    config["bh"] = retrieve(conf, "bh")
-    config["disk"] = retrieve(conf, "disk")
-    config["grids"] = retrieve(conf, "grids")
-    config["radiation"] = retrieve(conf, "radiation")
-    config["wind"] = retrieve(conf, "wind")
-    return config
-end
-
+include("radiation.jl")
+include("utils.jl")
+include("grids.jl")
 function initialize(config::Dict)
-    M = parse.(Float64, config["bh"]["M"][1])
-    mdot = parse(Float64, config["bh"]["mdot"][1])
-    spin = parse(Float64, config["bh"]["spin"][1])
-    eta = parse(Float64, config["bh"]["eta"][1])
+    M = config["bh"]["M"]
+    mdot =config["bh"]["mdot"]
+    spin = config["bh"]["spin"]
+    eta = config["bh"]["eta"]
     R_g = G * M * M_SUN / (C^2)
-    bh = BlackHole(M, mdot, spin, eta, R_g)
-    n_r = parse(Int64, config["grids"]["n_r"][1])
-    n_z = parse(Int64, config["grids"]["n_z"][1])
-    n_disk = parse(Int64, config["grids"]["n_r_disk"][1])
-    r_min = parse(Float64, config["grids"]["r_min"][1])
-    z_min = parse(Float64, config["grids"]["z_min"][1])
-    r_max = parse(Float64, config["grids"]["r_max"][1])
-    z_max = parse(Float64, config["grids"]["z_max"][1])
-    disk_r_min = parse(Float64, config["disk"]["inner_radius"][1])
-    disk_r_max = parse(Float64, config["disk"]["outer_radius"][1])
+    bh = BlackHole(M, mdot, spin, 6., eta, R_g)
+    n_r = config["grids"]["n_r"]
+    n_z = config["grids"]["n_z"]
+    n_disk = config["grids"]["n_r_disk"]
+    r_min = config["grids"]["r_min"]
+    z_min = config["grids"]["z_min"]
+    r_max = config["grids"]["r_max"]
+    z_max = config["grids"]["z_max"]
+    disk_r_min = config["disk"]["inner_radius"]
+    disk_r_max = config["disk"]["outer_radius"]
+
     r_range = 10 .^(range(log10(r_min), stop=log10(r_max), length=n_r))
     z_range = 10 .^(range(log10(z_min), stop=log10(z_max), length=n_z))
     disk_range = 10 .^(range(log10(disk_r_min), stop=log10(disk_r_max), length=n_disk))
@@ -45,14 +32,24 @@ function initialize(config::Dict)
         r_range,
         z_range,
         disk_range,
-        zeros(Float64, n_r, n_z), #density
+        config["wind"]["rho_shielding"] * ones(Float64, n_r, n_z), #density
         zeros(Float64, n_r, n_z), #tau_x
         zeros(Float64, n_r, n_z), #ionization
+        zeros(Float64, n_r, n_z), #fm
+        ones(Float64, n_disk), #mdot
+        ones(Float64, n_disk), #uv fraction
     )
-    wind = Wind(bh, grids)
+    edd_lumin = eddington_luminosity(bh)
+    f_uv = config["radiation"]["f_uv"]
+    f_x = config["radiation"]["f_x"]
+    bol_lumin = bh.mdot * edd_lumin
+    xray_lumin = f_x * bol_lumin
+    rad = Radiation(bol_lumin, edd_lumin, f_uv, f_x, xray_lumin)
+    wind = Wind(config, bh, grids, rad)
     return wind
 end
 
-config = readconfig("config.ini")
+config = TOML.parsefile("config.toml")
 wind = initialize(config)
-
+value = tau_x(10, 250, wind)
+println(value)
