@@ -92,7 +92,7 @@ function integrate_z(r, z, wind::Wind ; include_tau_uv)
                 reltol = reltol,
                 abstol=0.,
                 )
-
+    end
     val *= 2 * z^2
     return val
 end
@@ -140,7 +140,7 @@ function integrate_r(r, z, wind::Wind ; include_tau_uv)
                 reltol = reltol,
                 abstol=0.,
                 )
-
+    end
     val *= 2 * z
     return val
 end

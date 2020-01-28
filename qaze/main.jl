@@ -52,7 +52,7 @@ end
 
 config = TOML.parsefile("config.toml")
 wind = initialize(config)
-fr = force_radiation(100, 1, 2)
+fr = force_radiation(100, 1, 2, wind, include_tau_uv=false)
 println(fr)
-fr = force_radiation(100, 1, 2, include_tau_uv=true)
+fr = force_radiation(100, 1, 2, wind, include_tau_uv=true)
 println(fr)
