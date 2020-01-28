@@ -1,3 +1,4 @@
+module Qaze
 using TOML
 include("constants.jl")
 include("structures.jl")
@@ -54,3 +55,5 @@ end
 config = TOML.parsefile("config.toml")
 wind = initialize(config)
 lines = Array{Any, wind.config["wind"]["number_streamlines"]}
+
+end #module
