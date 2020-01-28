@@ -53,4 +53,4 @@ end
 
 config = TOML.parsefile("config.toml")
 wind = initialize(config)
-lines = Array{Any, wind.config.wind["number_streamlines"]}
+lines = Array{Any, wind.config["wind"]["number_streamlines"]}

@@ -20,9 +20,10 @@ function initialize_line(r_0, z_0, v_0, n_0, v_th, wind::Wind)
     line = Streamline(wind, r_0, z_0, v_0, v_phi_0, n_0, v_th, l, false)
     u0 = [r_0, z_0, 0., v_0]
     du0 = [0., v_0, a_r_0, a_z_0]
-    tspan = (0., 1e4)
-    problem = DAEProblem(residual, du0, u0, tspan, p=line)
-    integrator = init(problem, IDA())
+    tspan = (0., 1e8)
+    c_callback = DiscreteCallback(condition, affect, save_positions=(false, false))
+    problem = DAEProblem(residual!, du0, u0, tspan, p=line)
+    integrator = init(problem, IDA(), callback=c_callback)
     integrator.opts.abstol = 0.
     integrator.opts.reltol = wind.config["wind"]["solver_rtol"]
     return integrator
@@ -47,7 +48,7 @@ function compute_initial_acceleration(r_0, z_0, v_0, n_0, v_th, l, wind::Wind)
     return [a_r, a_z]
 end
 
-function residual(du, u, line, t)
+function residual!(resid, du, u, line, t)
     r, z, v_r, v_z = u
     r_dot, z_dot, v_r_dot, v_z_dot = du
     fg = gravity(r, z, line.wind.bh)
@@ -62,12 +63,10 @@ function residual(du, u, line, t)
     centrifugal_term = line.l^2 / r^3
     a_r = fg[1] + fr[1] + centrifugal_term
     a_z = fg[2] + fr[2] 
-    resid = zeros(4)
     resid[1] = r_dot - v_r
     resid[2] = z_dot - v_z
     resid[3] = v_r_dot - a_r
     resid[4] = v_z_dot - a_z
-    return resid
 end
 
 function condition(u, t, integrator)
@@ -81,6 +80,7 @@ function condition(u, t, integrator)
     end
     escaped_condition = d > integrator.p.wind.grids.d_max
     failed_condtion = z < integrator.p.z_0 
+    println("$d, $(integrator.p.wind.grids.d_max)")
     cond = escaped_condition | failed_condtion 
     return cond
 end

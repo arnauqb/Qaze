@@ -38,7 +38,7 @@ struct Wind
     is_first_iter::Bool
 end
 
-struct Streamline
+mutable struct Streamline
     wind::Wind
     r_0::Float64
     z_0::Float64
