@@ -27,6 +27,7 @@ struct Radiation
     f_uv::Float64
     f_x::Float64
     xray_luminosity::Float64
+    force_constant::Float64
 end
 struct Wind
     config::Dict

@@ -44,13 +44,15 @@ function initialize(config::Dict)
     f_x = config["radiation"]["f_x"]
     bol_lumin = bh.mdot * edd_lumin
     xray_lumin = f_x * bol_lumin
-    rad = Radiation(bol_lumin, edd_lumin, f_uv, f_x, xray_lumin)
+    force_constant = 3 / (8 * pi * bh.eta)
+    rad = Radiation(bol_lumin, edd_lumin, f_uv, f_x, xray_lumin, force_constant)
     wind = Wind(config, bh, grids, rad)
     return wind
 end
 
 config = TOML.parsefile("config.toml")
 wind = initialize(config)
-
-fm = force_multiplier(1e-6, 1e-10)
-println(fm)
+fr = force_radiation(100, 1, 2)
+println(fr)
+fr = force_radiation(100, 1, 2, include_tau_uv=true)
+println(fr)

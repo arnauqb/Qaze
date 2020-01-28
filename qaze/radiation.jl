@@ -3,6 +3,11 @@ include("constants.jl")
 include("utils.jl")
 include("structures.jl")
 
+function thermal_velocity(T, mu = 1.)
+    v = sqrt(K_B * T / (mu * M_P)) / C
+    return v
+end
+
 function eddington_luminosity(bh::BlackHole)
     constant = 4 * pi * M_P * C^3 / SIGMA_T
     return constant * bh.R_g
@@ -57,15 +62,37 @@ function integrate_z_kernel(x, r, z, wind::Wind)
     return r_part * phi_part
 end
 
-function integrate_z(r, z, wind::Wind)
+function integrate_z_notau_kernel(x, r, z, wind::Wind)
+    r_d, phi_d = x
+    r_d_arg = searchsortedlast(wind.grids.disk_range, r_d)
+    delta = r^2 + z^2 + r_d^2 - 2. * r * r_d * cos(phi_d)
+    nt = nt_rel_factors(r_d, wind.bh.spin, wind.bh.isco)
+    phi_part = 1 / delta^2
+    f_uv = wind.grids.uv_fraction[r_d_arg]
+    mdot = wind.grids.mdot[r_d_arg]
+    r_part = nt / r_d^2 * f_uv * mdot 
+    return r_part * phi_part
+end
+
+function integrate_z(r, z, wind::Wind ; include_tau_uv)
     xmin = (wind.config["disk"]["inner_radius"], 0.)
     xmax = (wind.config["disk"]["outer_radius"], pi)
-    (val, err) = hcubature(x->integrate_z_kernel(x, r, z, wind),
-            xmin,
-            xmax,
-            reltol = wind.config["radiation"]["adaptive_integral_epsrel"],
-            abstol=0.,
-            )
+    reltol = wind.config["radiation"]["adaptive_integral_epsrel"]
+    if include_tau_uv
+        (val, err) = hcubature(x->integrate_z_kernel(x, r, z, wind),
+                xmin,
+                xmax,
+                reltol = reltol,
+                abstol=0.,
+                )
+    else
+        (val, err) = hcubature(x->integrate_z_notau_kernel(x, r, z, wind),
+                xmin,
+                xmax,
+                reltol = reltol,
+                abstol=0.,
+                )
+
     val *= 2 * z^2
     return val
 end
@@ -81,6 +108,41 @@ function integrate_r_kernel(x, r, z, wind::Wind)
     mdot = wind.grids.mdot[r_d_arg]
     r_part = nt / r_d^2 * f_uv * mdot 
     return r_part * phi_part
+end
+
+function integrate_r_notau_kernel(x, r, z, wind::Wind)
+    r_d, phi_d = x
+    r_d_arg = searchsortedlast(wind.grids.disk_range, r_d)
+    delta = r^2 + z^2 + r_d^2 - 2. * r * r_d * cos(phi_d)
+    nt = nt_rel_factors(r_d, wind.bh.spin, wind.bh.isco)
+    phi_part = (r - r_d * cos(phi_d)) / delta^2
+    f_uv = wind.grids.uv_fraction[r_d_arg]
+    mdot = wind.grids.mdot[r_d_arg]
+    r_part = nt / r_d^2 * f_uv * mdot 
+    return r_part * phi_part
+end
+
+function integrate_r(r, z, wind::Wind ; include_tau_uv)
+    xmin = (wind.config["disk"]["inner_radius"], 0.)
+    xmax = (wind.config["disk"]["outer_radius"], pi)
+    reltol = wind.config["radiation"]["adaptive_integral_epsrel"]
+    if include_tau_uv
+        (val, err) = hcubature(x->integrate_r_kernel(x, r, z, wind),
+                xmin,
+                xmax,
+                reltol = reltol,
+                abstol=0.,
+                )
+    else
+        (val, err) = hcubature(x->integrate_r_notau_kernel(x, r, z, wind),
+                xmin,
+                xmax,
+                reltol = reltol,
+                abstol=0.,
+                )
+
+    val *= 2 * z
+    return val
 end
 
 function integrate_r(r, z, wind::Wind)
@@ -138,6 +200,11 @@ function ionization_parameter(r, z, density, wind::Wind)
     return xi
 end
 
+function tau_eff(density, dv_dr, v_th)
+    t = density * SIGMA_T * abs(dv_dr / v_th)
+    return t
+end
+
 function force_multiplier_k(xi)
     k = 0.03 + 0.385 * exp(-1.4 * xi^0.6)
     return k
@@ -169,6 +236,13 @@ function force_multiplier(t, xi)
     return fm
 end
 
+function force_radiation(r, z, fm, wind::Wind ; include_tau_uv = false)
+    i_r = integrate_r(r,z, wind, include_tau_uv=include_tau_uv)
+    i_z = integrate_z(r,z, wind, include_tau_uv=include_tau_uv)
+    i_aux = [i_r, i_z]
+    force = wind.radiation.force_constant * (1. + fm) * i_aux
+    return force
+end
 
 
 
