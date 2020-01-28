@@ -166,7 +166,7 @@ function opacity_x(xi)
     end
 end
 
-function tau_x(r, z, wind::Wind)
+function compute_tau_x(r, z, wind::Wind)
     r_arg = searchsortedlast(wind.grids.r_range, r)
     z_arg = searchsortedlast(wind.grids.z_range, z)
     line_coords = drawline(1,1,r_arg,z_arg)
@@ -195,12 +195,12 @@ end
 
 function ionization_parameter(r, z, density, wind::Wind)
     d2 = (r^2 + z^2) * wind.bh.R_g^2
-    tau_x = tau_x(r,z,wind)
+    tau_x = compute_tau_x(r,z,wind)
     xi = wind.radiation.xray_luminosity * exp(-tau_x) / (density * d2)
     return xi
 end
 
-function tau_eff(density, dv_dr, v_th)
+function compute_tau_eff(density, dv_dr, v_th)
     t = density * SIGMA_T * abs(dv_dr / v_th)
     return t
 end
@@ -243,9 +243,3 @@ function force_radiation(r, z, fm, wind::Wind ; include_tau_uv = false)
     force = wind.radiation.force_constant * (1. + fm) * i_aux
     return force
 end
-
-
-
-
-
-

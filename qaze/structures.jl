@@ -4,6 +4,7 @@ struct Grids
     n_disk::Int64
     r_range::Array{Float64,1}
     z_range::Array{Float64,1}
+    d_max::Float64
     disk_range::Array{Float64,1}
     density::Array{Float64,2}
     tau_x::Array{Float64,2}
@@ -34,5 +35,18 @@ struct Wind
     bh::BlackHole
     grids::Grids
     radiation::Radiation
+    is_first_iter::Bool
+end
+
+struct Streamline
+    wind::Wind
+    r_0::Float64
+    z_0::Float64
+    v_0::Float64
+    v_phi_0::Float64
+    n_0::Float64
+    v_th::Float64
+    l::Float64 # specific angular momentum
+    escaped::Bool
 end
 

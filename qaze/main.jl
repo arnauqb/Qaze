@@ -31,6 +31,7 @@ function initialize(config::Dict)
         n_disk,
         r_range,
         z_range,
+        sqrt(r_max^2 + z_max^2),
         disk_range,
         config["wind"]["rho_shielding"] * ones(Float64, n_r, n_z), #density
         zeros(Float64, n_r, n_z), #tau_x
@@ -46,13 +47,10 @@ function initialize(config::Dict)
     xray_lumin = f_x * bol_lumin
     force_constant = 3 / (8 * pi * bh.eta)
     rad = Radiation(bol_lumin, edd_lumin, f_uv, f_x, xray_lumin, force_constant)
-    wind = Wind(config, bh, grids, rad)
+    wind = Wind(config, bh, grids, rad, false)
     return wind
 end
 
 config = TOML.parsefile("config.toml")
 wind = initialize(config)
-fr = force_radiation(100, 1, 2, wind, include_tau_uv=false)
-println(fr)
-fr = force_radiation(100, 1, 2, wind, include_tau_uv=true)
-println(fr)
+lines = Array{Any, wind.config.wind["number_streamlines"]}
