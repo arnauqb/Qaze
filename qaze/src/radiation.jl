@@ -13,6 +13,20 @@ function eddington_luminosity(bh::BlackHole)
     return constant * bh.R_g
 end
 
+function initialize_uv_fraction(wind::Wind)
+    if wind.config["radiation"]["disk_uv_fraction"]
+        wind.grids.disk_range[:], wind.grids.uv_fractions[:] = wind.sed.compute_uv_fractions(
+            inner_radius=wind.bh.disk_r_min,
+            outer_radius=wind.bh.disk_r_max,
+            return_all=false,
+            log_spaced=true
+        )
+    else
+        wind.grids.disk_r_range = 10 .^(range(log10(wind.bh.disk_r_min), stop = log10(wind.bh.disk_r_max), length=wind.grids.n_disk))
+        wind.grids.uv_fractions = wind.radiation.f_uv .* ones(Float64, wind.grids.n_disk)
+    end
+end
+
 function nt_rel_factors(r, astar, isco)
     yms = sqrt(isco)
     y1 = 2 * cos((acos(astar) - pi) / 3)
@@ -37,8 +51,8 @@ function opacity_x(xi)
 end
 
 function compute_tau_x(r, z, wind::Wind)
-    r_arg = searchsortedlast(wind.grids.r_range, r)
-    z_arg = searchsortedlast(wind.grids.z_range, z)
+    r_arg = get_index(wind.grids.r_range, r)
+    z_arg = get_index(wind.grids.z_range, z)
     line_coords = drawline(1,1,r_arg,z_arg)
     tau = 0.
     tau_length = size(line_coords)[1]-1
@@ -60,13 +74,15 @@ function compute_tau_x(r, z, wind::Wind)
     end
     d = sqrt(r^2 + z^2) * wind.bh.R_g
     tau =  tau / tau_length *  SIGMA_T * d
+    @assert tau >= 0
     return tau
 end
 
 function ionization_parameter(r, z, density, wind::Wind)
     d2 = (r^2 + z^2) * wind.bh.R_g^2
     tau_x = compute_tau_x(r,z,wind)
-    xi = wind.radiation.xray_luminosity * exp(-tau_x) / (density * d2)
+    xi = wind.radiation.xray_luminosity * exp(-tau_x) / (density * d2) + 1e-20
+    @assert xi >= 0
     return xi
 end
 
@@ -107,6 +123,9 @@ function force_multiplier(t, xi)
 end
 
 function force_radiation(r, z, fm, wind::Wind ; include_tau_uv = false)
+    if z < 1e-3
+        return [0.,0.]
+    end
     int_values = integrate(r, z, wind, include_tau_uv=include_tau_uv)
     force = wind.radiation.force_constant * (1. + fm) * int_values
     return force

@@ -3,7 +3,7 @@ using Sundials
 include("radiation.jl")
 include("structures.jl")
 include("black_hole.jl")
-
+include("grids.jl")
 
 function compute_density(r, z, v_T, line::Streamline)
     d = sqrt(r^2 + z^2)
@@ -13,17 +13,23 @@ function compute_density(r, z, v_T, line::Streamline)
     return n
 end
 
-function initialize_line(r_0, z_0, v_0, n_0, v_th, wind::Wind)
+function initialize_line(line_id, r_0, z_0, v_0, n_0, v_th, wind::Wind)
     v_phi_0 = sqrt(1. / r_0)
     l = v_phi_0 * r_0
-    a_r_0, a_z_0 = compute_initial_acceleration(r_0, z_0, v_0, n_0, v_th, l, wind)
-    line = Streamline(wind, r_0, z_0, v_0, v_phi_0, n_0, v_th, l, false)
+    a_r_0, a_z_0, fm, xi = compute_initial_acceleration(r_0, z_0, v_0, n_0, v_th, l, wind)
     u0 = [r_0, z_0, 0., v_0]
     du0 = [0., v_0, a_r_0, a_z_0]
+    lw = wind.lines_widths[line_id]
+    u_hist = reshape(u0, (1,4))
+    line = Streamline(wind, line_id, r_0, z_0, v_0, v_phi_0, n_0, v_th, l, lw, false, 0, u_hist, [n_0], [fm], [xi])
     tspan = (0., 1e8)
-    c_callback = DiscreteCallback(condition, affect, save_positions=(false, false))
-    problem = DAEProblem(residual!, du0, u0, tspan, p=line)
-    integrator = init(problem, IDA(), callback=c_callback)
+    termination_cb = DiscreteCallback(condition, affect, save_positions=(false, false))
+    saved_values_type = SavedValues(Float64, Array{Float64,1})
+    saving_cb = SavingCallback(save, saved_values_type)
+    cb = CallbackSet(termination_cb, saving_cb)
+    problem = DAEProblem(residual!, du0, u0, tspan, p=line, differential_vars=[true, true, true, true])
+    integrator = init(problem, IDA(), callback=cb)
+    #integrator.p.u_hist = [integrator.p.u_hist ; transpose(u0)]
     integrator.opts.abstol = 0.
     integrator.opts.reltol = wind.config["wind"]["solver_rtol"]
     return integrator
@@ -45,7 +51,7 @@ function compute_initial_acceleration(r_0, z_0, v_0, n_0, v_th, l, wind::Wind)
     fr = force_radiation(r_0, z_0, fm, wind, include_tau_uv=!wind.is_first_iter)
     a_r = fg[1] + fr[1] + centrifugal_term
     a_z = fg[2] + fr[2] 
-    return [a_r, a_z]
+    return [a_r, a_z, fm, xi]
 end
 
 function residual!(resid, du, u, line, t)
@@ -78,13 +84,41 @@ function condition(u, t, integrator)
     if v_T > v_esc
         integrator.p.escaped = true
     end
+    crossing_condition = false
+    
+    if r < integrator.p.r_0
+        integrator.p.crossing_counter += 1
+        if integrator.p.crossing_counter > 4
+            crossing_condition = true
+        end
+    end
+    
     escaped_condition = d > integrator.p.wind.grids.d_max
     failed_condtion = z < integrator.p.z_0 
-    println("$d, $(integrator.p.wind.grids.d_max)")
-    cond = escaped_condition | failed_condtion 
+    cond = escaped_condition | failed_condtion | crossing_condition
     return cond
 end
 
 function affect(integrator)
     terminate!(integrator)
+end
+
+function save(u, t, integrator)
+    r, z, v_r, v_z = u
+    du = get_du(integrator)
+    v_r_dot, v_z_dot, a_r, a_z = du
+    v_T = sqrt(v_r^2 + v_z^2)
+    a_T = sqrt(a_r^2 + a_z^2)
+    dv_dr = a_T / v_T
+    n = compute_density(r, z, v_T, integrator.p)
+    xi = ionization_parameter(r, z, n, integrator.p.wind)
+    tau_eff = compute_tau_eff(n, dv_dr, integrator.p.v_th)
+    fm = force_multiplier(tau_eff, xi)
+    r_0, z_0, v_r_0, v_z_0 = integrator.p.u_hist[end,:]
+    update_density_and_fm_lines(r_0, r, z_0, z, integrator.p.line_width, n, fm, integrator.p.line_id, integrator.p.wind)
+    integrator.p.u_hist = [integrator.p.u_hist ; transpose(u)]
+    push!(integrator.p.fm_hist, fm)
+    push!(integrator.p.n_hist, n)
+    push!(integrator.p.xi_hist, xi)
+    return u
 end

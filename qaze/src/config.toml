@@ -1,7 +1,7 @@
 title = "Qwind config file"
 
 [general]
-save_dir = "julia_cd_5_10"
+save_path = "julia_cd_5_10.json"
 verbosity = 0
 
 [bh]
@@ -26,10 +26,10 @@ n_r_disk = 501
 n_phi_disk = 251
 
 [radiation]
-f_uv = 0.85 
-f_x = 0.15 
+f_uv = "auto" 
+f_x = "auto"
 non_adaptive_integral = false
-adaptive_integral_epsrel = 1e-4
+integral_rtol = 1e-2
 analytical_fm = false
 tau_uv_geometry = "disk"
 disk_uv_fraction = true 
@@ -43,12 +43,12 @@ tau_x_ignore_grid = false
 initial_radius = 6.0
 final_radius = 1600.0
 number_streamlines = 80
-iterations = 10
+iterations = 1
 log_spaced = true
-rho_shielding = 1e2
+n_shielding = 1e2
 wind_temperature = "disk"
 initial_conditions = "manual"
-rho_0 = 5e10
+n_0 = 5e10
 v_0 = "thermal"
 z_0 = 1.0
 solver_rtol = 1e-2

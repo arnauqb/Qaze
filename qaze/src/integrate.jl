@@ -1,11 +1,12 @@
 using Cubature
+include("utils.jl")
 
 function tau_uv_disk_blob(wind::Wind, r_d, phi_d, r, z)
     grids = wind.grids
     line_length = sqrt(r^2 + r_d^2 + z^2 - 2 * r * r_d * cos(phi_d))
-    r_arg = searchsortedlast(grids.r_range, r)
-    z_arg = searchsortedlast(grids.z_range, z)
-    r_d_arg = searchsortedlast(grids.r_range, r_d)
+    r_arg = get_index(grids.r_range, r)
+    z_arg = get_index(grids.z_range, z)
+    r_d_arg = get_index(grids.r_range, r_d)
     dr = abs(r_arg - r_d_arg)
     dz = abs(z_arg - 1)
     length = max(dr, dz) + 1
@@ -23,12 +24,12 @@ end
 
 function integrate_z_kernel(x, r, z, wind::Wind)
     r_d, phi_d = x
-    r_d_arg = searchsortedlast(wind.grids.disk_range, r_d)
+    r_d_arg = get_index(wind.grids.disk_range, r_d)
     tau_uv = tau_uv_disk_blob(wind, r_d, phi_d, r, z)
     delta = r^2 + z^2 + r_d^2 - 2. * r * r_d * cos(phi_d)
     nt = nt_rel_factors(r_d, wind.bh.spin, wind.bh.isco)
     phi_part = exp(-tau_uv) / delta^2
-    f_uv = wind.grids.uv_fraction[r_d_arg]
+    f_uv = wind.grids.uv_fractions[r_d_arg]
     mdot = wind.grids.mdot[r_d_arg]
     r_part = nt / r_d^2 * f_uv * mdot 
     return r_part * phi_part
@@ -36,11 +37,11 @@ end
 
 function integrate_z_notau_kernel(x, r, z, wind::Wind)
     r_d, phi_d = x
-    r_d_arg = searchsortedlast(wind.grids.disk_range, r_d)
+    r_d_arg = get_index(wind.grids.disk_range, r_d)
     delta = r^2 + z^2 + r_d^2 - 2. * r * r_d * cos(phi_d)
     nt = nt_rel_factors(r_d, wind.bh.spin, wind.bh.isco)
     phi_part = 1 / delta^2
-    f_uv = wind.grids.uv_fraction[r_d_arg]
+    f_uv = wind.grids.uv_fractions[r_d_arg]
     mdot = wind.grids.mdot[r_d_arg]
     r_part = nt / r_d^2 * f_uv * mdot 
     return r_part * phi_part
@@ -71,12 +72,12 @@ end
 
 function integrate_r_kernel(x, r, z, wind::Wind)
     r_d, phi_d = x
-    r_d_arg = searchsortedlast(wind.grids.disk_range, r_d)
+    r_d_arg = get_index(wind.grids.disk_range, r_d)
     tau_uv = tau_uv_disk_blob(wind, r_d, phi_d, r, z)
     delta = r^2 + z^2 + r_d^2 - 2. * r * r_d * cos(phi_d)
     nt = nt_rel_factors(r_d, wind.bh.spin, wind.bh.isco)
     phi_part = (r - r_d * cos(phi_d)) * exp(-tau_uv) / delta^2
-    f_uv = wind.grids.uv_fraction[r_d_arg]
+    f_uv = wind.grids.uv_fractions[r_d_arg]
     mdot = wind.grids.mdot[r_d_arg]
     r_part = nt / r_d^2 * f_uv * mdot 
     return r_part * phi_part
@@ -84,11 +85,11 @@ end
 
 function integrate_r_notau_kernel(x, r, z, wind::Wind)
     r_d, phi_d = x
-    r_d_arg = searchsortedlast(wind.grids.disk_range, r_d)
+    r_d_arg = get_index(wind.grids.disk_range, r_d)
     delta = r^2 + z^2 + r_d^2 - 2. * r * r_d * cos(phi_d)
     nt = nt_rel_factors(r_d, wind.bh.spin, wind.bh.isco)
     phi_part = (r - r_d * cos(phi_d)) / delta^2
-    f_uv = wind.grids.uv_fraction[r_d_arg]
+    f_uv = wind.grids.uv_fractions[r_d_arg]
     mdot = wind.grids.mdot[r_d_arg]
     r_part = nt / r_d^2 * f_uv * mdot 
     return r_part * phi_part
@@ -119,12 +120,12 @@ end
 
 function integrate_kernel(x, v, r, z, wind)
     r_d, phi_d = x
-    r_d_arg = searchsortedlast(wind.grids.disk_range, r_d)
+    r_d_arg = get_index(wind.grids.disk_range, r_d)
     tau_uv = tau_uv_disk_blob(wind, r_d, phi_d, r, z)
     delta = r^2 + z^2 + r_d^2 - 2. * r * r_d * cos(phi_d)
     nt = nt_rel_factors(r_d, wind.bh.spin, wind.bh.isco)
     phi_part =  exp(-tau_uv) / delta^2
-    f_uv = wind.grids.uv_fraction[r_d_arg]
+    f_uv = wind.grids.uv_fractions[r_d_arg]
     mdot = wind.grids.mdot[r_d_arg]
     r_part = nt / r_d^2 * f_uv * mdot 
     aux = r_part * phi_part
@@ -134,11 +135,11 @@ end
 
 function integrate_notau_kernel(x, v, r, z, wind)
     r_d, phi_d = x
-    r_d_arg = searchsortedlast(wind.grids.disk_range, r_d)
+    r_d_arg = get_index(wind.grids.disk_range, r_d)
     delta = r^2 + z^2 + r_d^2 - 2. * r * r_d * cos(phi_d)
     nt = nt_rel_factors(r_d, wind.bh.spin, wind.bh.isco)
     phi_part =  1. / delta^2
-    f_uv = wind.grids.uv_fraction[r_d_arg]
+    f_uv = wind.grids.uv_fractions[r_d_arg]
     mdot = wind.grids.mdot[r_d_arg]
     r_part = nt / r_d^2 * f_uv * mdot 
     aux = r_part * phi_part
