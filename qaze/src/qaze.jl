@@ -75,7 +75,7 @@ function initialize(config::Dict)
     force_constant = 3 / (8 * pi * bh.eta)
     rad = Radiation(bol_lumin, edd_lumin, f_uv, f_x, xray_lumin, force_constant)
     lines = Array{Any,1}(undef, config["wind"]["number_streamlines"])
-    wind = Wind(config, bh, sed, grids, rad, lines, lines_range, lines_widths, false)
+    wind = Wind(config, bh, sed, grids, rad, lines, lines_range, lines_widths, true)
     initialize_uv_fraction(wind)
     initialize_json(config["general"]["save_path"], wind)
     return wind
@@ -107,6 +107,7 @@ function start_lines(wind::Wind)
             write_line(wind.config["general"]["save_path"], line.p, it_num)
         end
         write_properties_and_grids(wind.config["general"]["save_path"], wind, it_num)
+        wind.is_first_iter = false
     end
 end
 config = TOML.parsefile("config.toml")
