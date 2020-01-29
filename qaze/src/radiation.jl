@@ -87,7 +87,10 @@ function ionization_parameter(r, z, density, wind::Wind)
 end
 
 function compute_tau_eff(density, dv_dr, v_th)
-    t = density * SIGMA_T * abs(dv_dr / v_th)
+    if dv_dr == 0
+        return 1.
+    end
+    t = density * SIGMA_T * abs(v_th / dv_dr)
     return t
 end
 
