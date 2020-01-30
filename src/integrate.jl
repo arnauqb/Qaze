@@ -1,5 +1,6 @@
 export tau_uv_disk_blob, integrate_kernel, integrate_notau_kernel, integrate
 using Cubature
+#using HCubature
 
 function tau_uv_disk_blob(wind::WindStruct, r_d, phi_d, r, z)
     grids = wind.grids
@@ -22,8 +23,7 @@ function tau_uv_disk_blob(wind::WindStruct, r_d, phi_d, r, z)
     return tau
 end
 
-function integrate_kernel(x, v, r, z, wind)
-    r_d, phi_d = x
+function integrate_kernel(v, r_d, phi_d, r, z, wind)
     r_d_arg = get_index(wind.grids.disk_range, r_d)
     tau_uv = tau_uv_disk_blob(wind, r_d, phi_d, r, z)
     delta = r^2 + z^2 + r_d^2 - 2. * r * r_d * cos(phi_d)
@@ -37,8 +37,7 @@ function integrate_kernel(x, v, r, z, wind)
     v[2] = aux
 end
 
-function integrate_notau_kernel(x, v, r, z, wind)
-    r_d, phi_d = x
+function integrate_notau_kernel(v, r_d, phi_d, r, z, wind)
     r_d_arg = get_index(wind.grids.disk_range, r_d)
     delta = r^2 + z^2 + r_d^2 - 2. * r * r_d * cos(phi_d)
     nt = nt_rel_factors(r_d, wind.bh.spin, wind.bh.isco)
@@ -57,7 +56,7 @@ function integrate(r, z, wind::WindStruct; include_tau_uv=true)
     xmax = (wind.config["disk"]["outer_radius"], pi)
     if include_tau_uv
         (val, err) = hcubature(2, 
-                (x,v) ->integrate_kernel(x, v, r, z, wind),
+                (x,v) ->integrate_kernel(v, x[1], x[2], r, z, wind),
                 xmin,
                 xmax,
                 reltol = wind.config["radiation"]["integral_rtol"],
@@ -65,13 +64,27 @@ function integrate(r, z, wind::WindStruct; include_tau_uv=true)
                 )
     else
         (val, err) = hcubature(2, 
-                (x,v) ->integrate_notau_kernel(x, v, r, z, wind),
+                (x,v) ->integrate_notau_kernel(v, x[1], x[2], r, z, wind),
                 xmin,
                 xmax,
                 reltol = wind.config["radiation"]["integral_rtol"],
                 abstol=0.,
                 )
     end
+   # if include_tau_uv
+   #     (val, err) = hcubature(x ->integrate_kernel(x[0], x[1], r, z, wind),
+   #             xmin,
+   #             xmax,
+   #             rtol = wind.config["radiation"]["integral_rtol"],
+   #             atol=0.,
+   #             )
+   # else
+   #     (val, err) = hcubature(x ->integrate_notau_kernel(x[0], x[1], r, z, wind),
+   #             xmin,
+   #             xmax,
+   #             rtol = wind.config["radiation"]["integral_rtol"],
+   #             atol=0.,
+   #             )
     val .*= [2 * z, 2 * z^2]
     return val
 end

@@ -26,7 +26,7 @@ function initialize_line(i, r, wind::WindStruct, is_first_iter)
 end
 
 function start_lines(wind::WindStruct)
-    is_first_iter = false
+    is_first_iter = true
     for it_num in 1:wind.config["wind"]["iterations"]
         for (i, r) in enumerate(wind.lines_range)
             line = initialize_line(i, r, wind, is_first_iter)
@@ -35,7 +35,7 @@ function start_lines(wind::WindStruct)
             write_line(wind.config["general"]["save_path"], line.p, it_num)
         end
         write_properties_and_grids(wind.config["general"]["save_path"], wind, it_num)
-        is_first_iter = true
+        is_first_iter = false
     end
 end
 #wind = initialize(config)

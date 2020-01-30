@@ -1,4 +1,4 @@
-export compute_density, initialize_line, compute_initial_acceleration, residual!, condition, affect, save
+export compute_density, initialize_line, compute_initial_acceleration, residual!, condition, affect, save, solve_line!
 using DifferentialEquations
 using Sundials
 
@@ -13,12 +13,14 @@ end
 function initialize_line(line_id, r_0, z_0, v_0, n_0, v_th, wind::WindStruct, is_first_iter)
     v_phi_0 = sqrt(1. / r_0)
     l = v_phi_0 * r_0
-    a_r_0, a_z_0, fm, xi = compute_initial_acceleration(r_0, z_0, v_0, n_0, v_th, l, wind, is_first_iter)
+    a_r_0, a_z_0, fm, xi, dv_dr = compute_initial_acceleration(r_0, z_0, v_0, n_0, v_th, l, wind, is_first_iter)
     u0 = [r_0, z_0, 0., v_0]
     du0 = [0., v_0, a_r_0, a_z_0]
     lw = wind.lines_widths[line_id]
     u_hist = reshape(u0, (1,4))
-    line = StreamlineStruct(wind, line_id, r_0, z_0, v_0, v_phi_0, n_0, v_th, l, lw, false, 0, is_first_iter, u_hist, [n_0], [fm], [xi])
+    line = StreamlineStruct(wind, line_id, r_0, z_0, v_0, v_phi_0, n_0,
+                            v_th, l, lw, false, 0, is_first_iter, u_hist,
+                            [n_0], [fm], [xi], [dv_dr], [a_r_0], [a_z_0])
     tspan = (0., 1e8)
     termination_cb = DiscreteCallback(condition, affect, save_positions=(false, false))
     saved_values_type = SavedValues(Float64, Array{Float64,1})
@@ -26,12 +28,14 @@ function initialize_line(line_id, r_0, z_0, v_0, n_0, v_th, wind::WindStruct, is
     cb = CallbackSet(termination_cb, saving_cb)
     problem = DAEProblem(residual!, du0, u0, tspan, p=line, differential_vars=[true, true, true, true])
     integrator = init(problem, IDA(), callback=cb)
-    #integrator.p.u_hist = [integrator.p.u_hist ; transpose(u0)]
     integrator.opts.abstol = 0.
     integrator.opts.reltol = wind.config["wind"]["solver_rtol"]
     return integrator
 end
 
+function solve_line!(line)
+    solve!(line)
+end
 function compute_initial_acceleration(r_0, z_0, v_0, n_0, v_th, l, wind::WindStruct, is_first_iter)
     fg = gravity(r_0, z_0, wind.bh)
     xi = ionization_parameter(r_0, z_0, n_0, wind)
@@ -48,7 +52,7 @@ function compute_initial_acceleration(r_0, z_0, v_0, n_0, v_th, l, wind::WindStr
     fr = force_radiation(r_0, z_0, fm, wind, include_tau_uv=!is_first_iter)
     a_r = fg[1] + fr[1] + centrifugal_term
     a_z = fg[2] + fr[2] 
-    return [a_r, a_z, fm, xi]
+    return [a_r, a_z, fm, xi, dv_dr]
 end
 
 function residual!(resid, du, u, line, t)
@@ -82,7 +86,6 @@ function condition(u, t, integrator)
         integrator.p.escaped = true
     end
     crossing_condition = false
-    
     if r < integrator.p.r_0
         integrator.p.crossing_counter += 1
         if integrator.p.crossing_counter > 4
@@ -112,11 +115,18 @@ function save(u, t, integrator)
     tau_eff = compute_tau_eff(n, dv_dr, integrator.p.v_th)
     fm = force_multiplier(tau_eff, xi)
     r_0, z_0, v_r_0, v_z_0 = integrator.p.u_hist[end,:]
-    update_density_and_fm_lines(r_0, r, z_0, z, integrator.p.line_width, n, fm, integrator.p.line_id, integrator.p.wind)
+    if integrator.p.wind.config["radiation"]["tau_uv_include_fm"]
+        update_density_and_fm_lines(r_0, r, z_0, z, integrator.p.line_width, n, fm, integrator.p.line_id, integrator.p.wind)
+    else
+        update_density_and_fm_lines(r_0, r, z_0, z, integrator.p.line_width, n, 0., integrator.p.line_id, integrator.p.wind)
+    end
     integrator.p.u_hist = [integrator.p.u_hist ; transpose(u)]
     push!(integrator.p.fm_hist, fm)
     push!(integrator.p.n_hist, n)
     push!(integrator.p.xi_hist, xi)
+    push!(integrator.p.dv_dr_hist, dv_dr)
+    push!(integrator.p.a_r_hist, a_r)
+    push!(integrator.p.a_z_hist, a_z)
     return u
 end
 #end

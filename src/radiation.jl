@@ -53,7 +53,7 @@ function compute_tau_x(r, z, wind::WindStruct)
     z_arg = get_index(wind.grids.z_range, z)
     line_coords = drawline(1,1,r_arg,z_arg)
     tau = 0.
-    tau_length = size(line_coords)[1]-1
+    tau_length = size(line_coords)[1]
     #for (k, row) in enumerate(eachrow(line_coords)[:aux])
     for k in 1:tau_length
         row = line_coords[k,:]
@@ -64,7 +64,7 @@ function compute_tau_x(r, z, wind::WindStruct)
         density = wind.grids.density[i,j]
         xi0 = wind.radiation.xray_luminosity / (density * d^2)
         xi = xi0
-        for dummy in 1:3
+        for dummy in 1:2
             tau_prov = (tau + density * opacity_x(xi)) * d / k * SIGMA_T
             xi = xi0 * exp(-tau_prov)
         end
@@ -124,10 +124,13 @@ function force_multiplier(t, xi)
 end
 
 function force_radiation(r, z, fm, wind::WindStruct ; include_tau_uv = false)
-    if z < 1e-3
+    if (z < 1e-3 || wind.config["wind"]["gravity_only"])
         return [0.,0.]
     end
     int_values = integrate(r, z, wind, include_tau_uv=include_tau_uv)
+    if wind.config["wind"]["nofm"]
+        fm = 0.
+    end
     force = wind.radiation.force_constant * (1. + fm) * int_values
     return force
 end
