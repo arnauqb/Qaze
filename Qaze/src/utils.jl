@@ -1,7 +1,7 @@
+export drawline, get_index, initialize_json, write_line, write_properties_and_grids
 using JSON
 using Printf
-#include("structures.jl")
-#using ..structures
+
 function drawline(x1::Int64, y1::Int64, x2::Int64, y2::Int64)
     x=x1
     y=y1
@@ -47,7 +47,7 @@ end
 function get_index(array, value)
     return max(searchsortedlast(array, value), 1)
 end
-function initialize_json(json_file, wind::Wind)
+function initialize_json(json_file, wind::WindStruct)
     data = Dict()
     data["metadata"] = Dict()
     data["metadata"]["M"] = wind.bh.M
@@ -87,7 +87,7 @@ function initialize_json(json_file, wind::Wind)
 
 end
 
-function write_line(json_file, line::Streamline, it_num) 
+function write_line(json_file, line::StreamlineStruct, it_num) 
     line_data = Dict(
         "r" => line.u_hist[:,1],
         "z" => line.u_hist[:,2],
@@ -107,7 +107,7 @@ function write_line(json_file, line::Streamline, it_num)
     end
 end
 
-function write_properties_and_grids(json_file, wind::Wind, it_num)
+function write_properties_and_grids(json_file, wind::WindStruct, it_num)
     #=
     properties = Dict(
         "mdot_w_gs" => wind.mdot_w,

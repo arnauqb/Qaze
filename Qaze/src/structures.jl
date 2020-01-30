@@ -1,5 +1,8 @@
-#using PyCall
-struct Grids
+#ENV["PYCALL_JL_RUNTIME_PYTHON"]="/home/arnau/Documents/qwind/env/bin/python"
+using PyCall
+export GridsStruct, BlackHoleStruct, RadiationStruct, StreamlineStruct, WindStruct
+
+struct GridsStruct
     n_r::Int64
     n_z::Int64
     n_disk::Int64
@@ -17,7 +20,7 @@ struct Grids
     mdot::Array{Float64,1}
     uv_fractions::Array{Float64,1}
 end
-struct BlackHole
+struct BlackHoleStruct
     M::Float64
     mdot::Float64
     spin::Float64
@@ -28,7 +31,7 @@ struct BlackHole
     disk_r_max::Float64
 end
 
-struct Radiation
+struct RadiationStruct
     bol_luminosity::Float64
     eddington_luminosity::Float64
     f_uv::Float64
@@ -36,19 +39,19 @@ struct Radiation
     xray_luminosity::Float64
     force_constant::Float64
 end
-struct Wind
+struct WindStruct
     config::Dict
-    bh::BlackHole
+    bh::BlackHoleStruct
     sed::PyObject
-    grids::Grids
-    radiation::Radiation
+    grids::GridsStruct
+    radiation::RadiationStruct
     lines::Array{Any,1}
     lines_range::Array{Float64,1}
     lines_widths::Array{Float64,1}
 end
 
-mutable struct Streamline
-    wind::Wind
+mutable struct StreamlineStruct
+    wind::WindStruct
     line_id::Int64
     r_0::Float64
     z_0::Float64
@@ -66,3 +69,4 @@ mutable struct Streamline
     fm_hist::Array{Float64,1}
     xi_hist::Array{Float64,1}
 end
+#end

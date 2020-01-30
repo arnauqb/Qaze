@@ -1,9 +1,4 @@
-#include("constants.jl")
-#include("structures.jl")
-#using ..constants
-#using ..structures
-
-function gravity(r, z, bh::BlackHole)
+function gravity(r, z, bh::BlackHoleStruct)
     #=
     Gravitational force in units of Rg/c^2
     =#

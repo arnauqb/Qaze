@@ -1,24 +1,17 @@
-module radiation
-#include("constants.jl")
-#include("utils.jl")
-#include("structures.jl")
-#include("integrate.jl")
-#using ..constants
-#using ..utils
-#using ..structures
-#using ..integrate
+export thermal_velocity, eddington_luminosity, initialize_uv_fraction, nt_rel_factors, opacity_x, compute_tau_x, ionization_parameter,
+       compute_tau_eff, force_multiplier, force_radiation
 
 function thermal_velocity(T, mu = 1.)
     v = sqrt(K_B * T / (mu * M_P)) / C
     return v
 end
 
-function eddington_luminosity(bh::BlackHole)
+function eddington_luminosity(bh::BlackHoleStruct)
     constant = 4 * pi * M_P * C^3 / SIGMA_T
     return constant * bh.R_g
 end
 
-function initialize_uv_fraction(wind::Wind)
+function initialize_uv_fraction(wind::WindStruct)
     if wind.config["radiation"]["disk_uv_fraction"]
         wind.grids.disk_range[:], wind.grids.uv_fractions[:] = wind.sed.compute_uv_fractions(
             inner_radius=wind.bh.disk_r_min,
@@ -55,7 +48,7 @@ function opacity_x(xi)
     end
 end
 
-function compute_tau_x(r, z, wind::Wind)
+function compute_tau_x(r, z, wind::WindStruct)
     r_arg = get_index(wind.grids.r_range, r)
     z_arg = get_index(wind.grids.z_range, z)
     line_coords = drawline(1,1,r_arg,z_arg)
@@ -83,7 +76,7 @@ function compute_tau_x(r, z, wind::Wind)
     return tau
 end
 
-function ionization_parameter(r, z, density, wind::Wind)
+function ionization_parameter(r, z, density, wind::WindStruct)
     d2 = (r^2 + z^2) * wind.bh.R_g^2
     tau_x = compute_tau_x(r,z,wind)
     xi = wind.radiation.xray_luminosity * exp(-tau_x) / (density * d2) + 1e-20
@@ -130,13 +123,11 @@ function force_multiplier(t, xi)
     return fm
 end
 
-function force_radiation(r, z, fm, wind::Wind ; include_tau_uv = false)
+function force_radiation(r, z, fm, wind::WindStruct ; include_tau_uv = false)
     if z < 1e-3
         return [0.,0.]
     end
     int_values = integrate(r, z, wind, include_tau_uv=include_tau_uv)
     force = wind.radiation.force_constant * (1. + fm) * int_values
     return force
-end
-
 end

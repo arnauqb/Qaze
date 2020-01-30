@@ -1,8 +1,7 @@
+export tau_uv_disk_blob, integrate_kernel, integrate_notau_kernel, integrate
 using Cubature
-#using ..utils
-include("utils.jl")
 
-function tau_uv_disk_blob(wind::Wind, r_d, phi_d, r, z)
+function tau_uv_disk_blob(wind::WindStruct, r_d, phi_d, r, z)
     grids = wind.grids
     line_length = sqrt(r^2 + r_d^2 + z^2 - 2 * r * r_d * cos(phi_d))
     r_arg = get_index(grids.r_range, r)
@@ -53,7 +52,7 @@ function integrate_notau_kernel(x, v, r, z, wind)
 end
 
 
-function integrate(r, z, wind::Wind; include_tau_uv=true)
+function integrate(r, z, wind::WindStruct; include_tau_uv=true)
     xmin = (wind.config["disk"]["inner_radius"], 0.)
     xmax = (wind.config["disk"]["outer_radius"], pi)
     if include_tau_uv

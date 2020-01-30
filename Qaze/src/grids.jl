@@ -1,8 +1,7 @@
+export update_density_and_fm_lines
 using Statistics
-include("structures.jl")
-include("utils.jl")
 
-function update_density_and_fm_lines(r1, r2, z1, z2, lw, rho, fm, line_id, wind::Wind)
+function update_density_and_fm_lines(r1, r2, z1, z2, lw, rho, fm, line_id, wind::WindStruct)
     if z1 > z2
         z1, z2 = z2, z1
     end
