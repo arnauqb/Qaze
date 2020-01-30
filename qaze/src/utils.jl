@@ -1,6 +1,7 @@
 using JSON
 using Printf
-include("structures.jl")
+#include("structures.jl")
+#using ..structures
 function drawline(x1::Int64, y1::Int64, x2::Int64, y2::Int64)
     x=x1
     y=y1

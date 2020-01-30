@@ -1,8 +1,9 @@
+module Qaze
 ENV["PYCALL_JL_RUNTIME_PYTHON"]="/home/arnau/Documents/qwind/env/bin/python"
 using PyCall
-println(pyimport("sys").executable)
 qsosed = pyimport("qsosed")
 using TOML
+println(pyimport("sys").executable)
 include("constants.jl")
 include("structures.jl")
 include("black_hole.jl")
@@ -75,13 +76,13 @@ function initialize(config::Dict)
     force_constant = 3 / (8 * pi * bh.eta)
     rad = Radiation(bol_lumin, edd_lumin, f_uv, f_x, xray_lumin, force_constant)
     lines = Array{Any,1}(undef, config["wind"]["number_streamlines"])
-    wind = Wind(config, bh, sed, grids, rad, lines, lines_range, lines_widths, true)
+    wind = Wind(config, bh, sed, grids, rad, lines, lines_range, lines_widths)
     initialize_uv_fraction(wind)
     initialize_json(config["general"]["save_path"], wind)
     return wind
 end
 
-function initialize_line(i, r, wind::Wind)
+function initialize_line(i, r, wind::Wind, is_first_iter)
     T = wind.sed.disk_nt_temperature4(r)^(0.25)
     v_th = thermal_velocity(T)
     if wind.config["wind"]["v_0"] == "thermal"
@@ -89,7 +90,7 @@ function initialize_line(i, r, wind::Wind)
     end
     n_0 = wind.config["wind"]["n_0"]
     z_0 = wind.config["wind"]["z_0"]
-    line_integ = initialize_line(i, r, z_0, v_0, n_0, v_th, wind)
+    line_integ = initialize_line(i, r, z_0, v_0, n_0, v_th, wind, is_first_iter)
     return line_integ
 end
 
@@ -99,15 +100,16 @@ end
 #end
 
 function start_lines(wind::Wind)
+    is_first_iter = false
     for it_num in 1:wind.config["wind"]["iterations"]
         for (i, r) in enumerate(wind.lines_range)
-            line = initialize_line(i, r, wind)
+            line = initialize_line(i, r, wind, is_first_iter)
             println("Solving line $i of $(length(wind.lines))")
             solve!(line)
             write_line(wind.config["general"]["save_path"], line.p, it_num)
         end
         write_properties_and_grids(wind.config["general"]["save_path"], wind, it_num)
-        wind.is_first_iter = false
+        is_first_iter = true
     end
 end
 config = TOML.parsefile("config.toml")
@@ -119,3 +121,4 @@ start_lines(wind)
 #line = initialize_line(1, 100, 1, v_th, 2e8, v_th, wind)
 #write_line(json_file)
 
+end #module

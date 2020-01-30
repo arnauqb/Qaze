@@ -2,3 +2,10 @@ name = "qaze"
 uuid = "15167382-8bc6-4af6-a3a1-ad19aae7d566"
 authors = ["Arnau <arnau.quera-bofarull@durham.ac.uk>"]
 version = "0.1.0"
+
+[deps]
+Cubature = "667455a9-e2ce-5579-9412-b964f529a492"
+DifferentialEquations = "0c46a032-eb83-5123-abaf-570d42b7fbaa"
+JSON = "682c06a0-de6a-54ab-a142-c8b1cf79cde6"
+PyCall = "438e738f-606a-5dbb-bf0a-cddfbfd45ab0"
+Sundials = "c3572dad-4567-51f8-b174-8c6c989267f4"

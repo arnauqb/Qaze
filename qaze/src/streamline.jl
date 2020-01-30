@@ -1,9 +1,14 @@
+#module streamline
 using DifferentialEquations
 using Sundials
-include("radiation.jl")
-include("structures.jl")
-include("black_hole.jl")
-include("grids.jl")
+#using ..radiation
+#using ..structures
+#using ..black_hole
+#using ..grids
+#include("radiation.jl")
+#include("structures.jl")
+#include("black_hole.jl")
+#include("grids.jl")
 
 function compute_density(r, z, v_T, line::Streamline)
     d = sqrt(r^2 + z^2)
@@ -13,15 +18,15 @@ function compute_density(r, z, v_T, line::Streamline)
     return n
 end
 
-function initialize_line(line_id, r_0, z_0, v_0, n_0, v_th, wind::Wind)
+function initialize_line(line_id, r_0, z_0, v_0, n_0, v_th, wind::Wind, is_first_iter)
     v_phi_0 = sqrt(1. / r_0)
     l = v_phi_0 * r_0
-    a_r_0, a_z_0, fm, xi = compute_initial_acceleration(r_0, z_0, v_0, n_0, v_th, l, wind)
+    a_r_0, a_z_0, fm, xi = compute_initial_acceleration(r_0, z_0, v_0, n_0, v_th, l, wind, is_first_iter)
     u0 = [r_0, z_0, 0., v_0]
     du0 = [0., v_0, a_r_0, a_z_0]
     lw = wind.lines_widths[line_id]
     u_hist = reshape(u0, (1,4))
-    line = Streamline(wind, line_id, r_0, z_0, v_0, v_phi_0, n_0, v_th, l, lw, false, 0, u_hist, [n_0], [fm], [xi])
+    line = Streamline(wind, line_id, r_0, z_0, v_0, v_phi_0, n_0, v_th, l, lw, false, 0, is_first_iter, u_hist, [n_0], [fm], [xi])
     tspan = (0., 1e8)
     termination_cb = DiscreteCallback(condition, affect, save_positions=(false, false))
     saved_values_type = SavedValues(Float64, Array{Float64,1})
@@ -35,11 +40,11 @@ function initialize_line(line_id, r_0, z_0, v_0, n_0, v_th, wind::Wind)
     return integrator
 end
 
-function compute_initial_acceleration(r_0, z_0, v_0, n_0, v_th, l, wind::Wind)
+function compute_initial_acceleration(r_0, z_0, v_0, n_0, v_th, l, wind::Wind, is_first_iter)
     fg = gravity(r_0, z_0, wind.bh)
     xi = ionization_parameter(r_0, z_0, n_0, wind)
     fm = force_multiplier(1, xi)
-    fr = force_radiation(r_0, z_0, fm, wind, include_tau_uv=!wind.is_first_iter)
+    fr = force_radiation(r_0, z_0, fm, wind, include_tau_uv=!is_first_iter)
     centrifugal_term = l^2 / r_0^3
     a_r = fg[1] + fr[1] + centrifugal_term
     a_z = fg[2] + fr[2] 
@@ -48,7 +53,7 @@ function compute_initial_acceleration(r_0, z_0, v_0, n_0, v_th, l, wind::Wind)
     dv_dr = a_T / v_0
     tau_eff = compute_tau_eff(n_0, dv_dr, v_th)
     fm = force_multiplier(tau_eff, xi)
-    fr = force_radiation(r_0, z_0, fm, wind, include_tau_uv=!wind.is_first_iter)
+    fr = force_radiation(r_0, z_0, fm, wind, include_tau_uv=!is_first_iter)
     a_r = fg[1] + fr[1] + centrifugal_term
     a_z = fg[2] + fr[2] 
     return [a_r, a_z, fm, xi]
@@ -65,7 +70,7 @@ function residual!(resid, du, u, line, t)
     xi = ionization_parameter(r, z, n, line.wind)
     tau_eff = compute_tau_eff(n, dv_dr, line.v_th)
     fm = force_multiplier(tau_eff, xi)
-    fr = force_radiation(r, z, fm, line.wind, include_tau_uv=!line.wind.is_first_iter)
+    fr = force_radiation(r, z, fm, line.wind, include_tau_uv=!line.is_first_iter)
     centrifugal_term = line.l^2 / r^3
     a_r = fg[1] + fr[1] + centrifugal_term
     a_z = fg[2] + fr[2] 
@@ -121,4 +126,5 @@ function save(u, t, integrator)
     push!(integrator.p.n_hist, n)
     push!(integrator.p.xi_hist, xi)
     return u
+end
 end

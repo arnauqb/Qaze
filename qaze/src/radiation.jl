@@ -1,7 +1,12 @@
-include("constants.jl")
-include("utils.jl")
-include("structures.jl")
-include("integrate.jl")
+module radiation
+#include("constants.jl")
+#include("utils.jl")
+#include("structures.jl")
+#include("integrate.jl")
+#using ..constants
+#using ..utils
+#using ..structures
+#using ..integrate
 
 function thermal_velocity(T, mu = 1.)
     v = sqrt(K_B * T / (mu * M_P)) / C
@@ -132,4 +137,6 @@ function force_radiation(r, z, fm, wind::Wind ; include_tau_uv = false)
     int_values = integrate(r, z, wind, include_tau_uv=include_tau_uv)
     force = wind.radiation.force_constant * (1. + fm) * int_values
     return force
+end
+
 end

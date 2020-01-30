@@ -1,5 +1,4 @@
-ENV["PYCALL_JL_RUNTIME_PYTHON"]="/home/arnau/Documents/qwind/env/bin/python"
-using PyCall
+#using PyCall
 struct Grids
     n_r::Int64
     n_z::Int64
@@ -46,7 +45,6 @@ struct Wind
     lines::Array{Any,1}
     lines_range::Array{Float64,1}
     lines_widths::Array{Float64,1}
-    is_first_iter::Bool
 end
 
 mutable struct Streamline
@@ -62,9 +60,9 @@ mutable struct Streamline
     line_width::Float64
     escaped::Bool
     crossing_counter::Int64
+    is_first_iter::Bool
     u_hist::Array{Float64,2}
     n_hist::Array{Float64,1}
     fm_hist::Array{Float64,1}
     xi_hist::Array{Float64,1}
 end
-
