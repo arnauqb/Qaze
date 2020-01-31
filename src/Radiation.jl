@@ -6,11 +6,6 @@ function thermal_velocity(T, mu = 1.)
     return v
 end
 
-function eddington_luminosity(bh::BlackHoleStruct)
-    constant = 4 * pi * M_P * C^3 / SIGMA_T
-    return constant * bh.R_g
-end
-
 function initialize_uv_fraction(wind::WindStruct)
     if wind.config["radiation"]["disk_uv_fraction"]
         wind.grids.disk_range[:], wind.grids.uv_fractions[:] = wind.sed.compute_uv_fractions(
@@ -54,7 +49,6 @@ function compute_tau_x(r, z, wind::WindStruct)
     line_coords = drawline(1,1,r_arg,z_arg)
     tau = 0.
     tau_length = size(line_coords)[1]
-    #for (k, row) in enumerate(eachrow(line_coords)[:aux])
     for k in 1:tau_length
         row = line_coords[k,:]
         i, j = row
@@ -62,6 +56,7 @@ function compute_tau_x(r, z, wind::WindStruct)
         zp = wind.grids.z_range[j]
         d = sqrt(rp^2 + zp^2) * wind.bh.R_g
         density = wind.grids.density[i,j]
+        #println("r: $rp z :$zp den: $density")
         xi0 = wind.radiation.xray_luminosity / (density * d^2)
         xi = xi0
         for dummy in 1:2
@@ -76,9 +71,8 @@ function compute_tau_x(r, z, wind::WindStruct)
     return tau
 end
 
-function ionization_parameter(r, z, density, wind::WindStruct)
+function ionization_parameter(r, z, density, tau_x, wind::WindStruct)
     d2 = (r^2 + z^2) * wind.bh.R_g^2
-    tau_x = compute_tau_x(r,z,wind)
     xi = wind.radiation.xray_luminosity * exp(-tau_x) / (density * d2) + 1e-20
     @assert xi >= 0
     return xi

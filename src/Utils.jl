@@ -47,6 +47,7 @@ end
 function get_index(array, value)
     return max(searchsortedlast(array, value), 1)
 end
+
 function initialize_json(json_file, wind::WindStruct)
     data = Dict()
     data["metadata"] = Dict()
@@ -78,7 +79,8 @@ function initialize_json(json_file, wind::WindStruct)
         data[@sprintf("it_%02d", it)] = Dict(
                 "lines" => [],
                 "lines_escaped" => [],
-                "grids" => Dict()
+                "grids" => Dict(),
+                "properties" => Dict()
         )
     end
     open(json_file, "w") do f
@@ -108,32 +110,32 @@ function write_line(json_file, line::StreamlineStruct, it_num)
 end
 
 function write_properties_and_grids(json_file, wind::WindStruct, it_num)
-    #=
+    mdot_wind = compute_wind_mdot(wind)
+    kin_lumin = compute_kinetic_luminosity(wind)
     properties = Dict(
-        "mdot_w_gs" => wind.mdot_w,
-        "mdot_w_msunyr" => wind.mdot_w / constants.M_SUN * constants.YEAR_TO_SEC,
-        "kin_lumin" => wind.kinetic_luminosity,
-        "angle" => wind.angle,
-        "terminal_velocity" => wind.v_terminal,
+        "mdot_w_gs" => mdot_wind,
+        "mdot_w_msunyr" => mdot_wind / M_SUN * YEAR_TO_SEC,
+        "terminal_velocity" => compute_maximum_velocity(wind),
+        "kin_lumin" => kin_lumin,
+        "kin_lumin_norm" => kin_lumin / eddington_luminosity(wind.bh),
     )
-
-    print("updating tau_x grid...")
-    wind.grid.tau_x_grid.update_all()
-    print("updating ionization grid...")
-    wind.grid.ionization_grid.update_all()
-    =#
+    println("\n updating tau_x and xi grid...")
+    update_taux_and_xi_grid(wind)
+    #wind.grid.tau_x_grid.update_all()
+    #print("updating ionization grid...")
+    #wind.grid.ionization_grid.update_all()
     grids = Dict(
         "density" => wind.grids.density,
         "force_multiplier" => wind.grids.fm,
+        "tau_x" => wind.grids.tau_x,
+        "ionization" => wind.grids.ionization,
     )
     data = open(json_file, "r") do f
         data = JSON.parse(f)
     end
     open(json_file, "w") do f
-        #data[@sprintf("it_%02d", it_num)]["properties"] = properties
+        data[@sprintf("it_%02d", it_num)]["properties"] = properties
         data[@sprintf("it_%02d", it_num)]["grids"] = grids 
         JSON.print(f,data)
     end
-    #with open(os.path.join(folder_name, "wind_properties.csv"), "w") as f:
-    #    f.write(json.dumps(properties))
 end

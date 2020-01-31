@@ -13,14 +13,14 @@ end
 function initialize_line(line_id, r_0, z_0, v_0, n_0, v_th, wind::WindStruct, is_first_iter)
     v_phi_0 = sqrt(1. / r_0)
     l = v_phi_0 * r_0
-    a_r_0, a_z_0, fm, xi, dv_dr = compute_initial_acceleration(r_0, z_0, v_0, n_0, v_th, l, wind, is_first_iter)
+    a_r_0, a_z_0, fm, xi, dv_dr, tau_x = compute_initial_acceleration(r_0, z_0, v_0, n_0, v_th, l, wind, is_first_iter)
     u0 = [r_0, z_0, 0., v_0]
     du0 = [0., v_0, a_r_0, a_z_0]
     lw = wind.lines_widths[line_id]
     u_hist = reshape(u0, (1,4))
     line = StreamlineStruct(wind, line_id, r_0, z_0, v_0, v_phi_0, n_0,
                             v_th, l, lw, false, 0, is_first_iter, u_hist,
-                            [n_0], [fm], [xi], [dv_dr], [a_r_0], [a_z_0])
+                            [n_0], [tau_x], [fm], [xi], [dv_dr], [a_r_0], [a_z_0])
     tspan = (0., 1e8)
     termination_cb = DiscreteCallback(condition, affect, save_positions=(false, false))
     saved_values_type = SavedValues(Float64, Array{Float64,1})
@@ -36,9 +36,11 @@ end
 function solve_line!(line)
     solve!(line)
 end
+
 function compute_initial_acceleration(r_0, z_0, v_0, n_0, v_th, l, wind::WindStruct, is_first_iter)
     fg = gravity(r_0, z_0, wind.bh)
-    xi = ionization_parameter(r_0, z_0, n_0, wind)
+    tau_x = compute_tau_x(r_0, z_0, wind)
+    xi = ionization_parameter(r_0, z_0, n_0, tau_x, wind)
     fm = force_multiplier(1, xi)
     fr = force_radiation(r_0, z_0, fm, wind, include_tau_uv=!is_first_iter)
     centrifugal_term = l^2 / r_0^3
@@ -52,7 +54,7 @@ function compute_initial_acceleration(r_0, z_0, v_0, n_0, v_th, l, wind::WindStr
     fr = force_radiation(r_0, z_0, fm, wind, include_tau_uv=!is_first_iter)
     a_r = fg[1] + fr[1] + centrifugal_term
     a_z = fg[2] + fr[2] 
-    return [a_r, a_z, fm, xi, dv_dr]
+    return [a_r, a_z, fm, xi, dv_dr, tau_x]
 end
 
 function residual!(resid, du, u, line, t)
@@ -63,7 +65,8 @@ function residual!(resid, du, u, line, t)
     a_T = sqrt(v_r_dot^2 + v_z_dot^2)
     dv_dr = a_T / v_T
     n = compute_density(r, z, v_T, line)
-    xi = ionization_parameter(r, z, n, line.wind)
+    tau_x = compute_tau_x(r, z, line.wind)
+    xi = ionization_parameter(r, z, n, tau_x, line.wind)
     tau_eff = compute_tau_eff(n, dv_dr, line.v_th)
     fm = force_multiplier(tau_eff, xi)
     fr = force_radiation(r, z, fm, line.wind, include_tau_uv=!line.is_first_iter)
@@ -100,6 +103,11 @@ function condition(u, t, integrator)
 end
 
 function affect(integrator)
+    if integrator.p.escaped
+        print(" \U1F4A8")
+    else
+        print(" \U1F4A5")
+    end
     terminate!(integrator)
 end
 
@@ -111,7 +119,8 @@ function save(u, t, integrator)
     a_T = sqrt(a_r^2 + a_z^2)
     dv_dr = a_T / v_T
     n = compute_density(r, z, v_T, integrator.p)
-    xi = ionization_parameter(r, z, n, integrator.p.wind)
+    tau_x = compute_tau_x(r, z, integrator.p.wind)
+    xi = ionization_parameter(r, z, n, tau_x, integrator.p.wind)
     tau_eff = compute_tau_eff(n, dv_dr, integrator.p.v_th)
     fm = force_multiplier(tau_eff, xi)
     r_0, z_0, v_r_0, v_z_0 = integrator.p.u_hist[end,:]
@@ -123,6 +132,7 @@ function save(u, t, integrator)
     integrator.p.u_hist = [integrator.p.u_hist ; transpose(u)]
     push!(integrator.p.fm_hist, fm)
     push!(integrator.p.n_hist, n)
+    push!(integrator.p.tau_x_hist, tau_x)
     push!(integrator.p.xi_hist, xi)
     push!(integrator.p.dv_dr_hist, dv_dr)
     push!(integrator.p.a_r_hist, a_r)

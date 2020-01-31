@@ -1,4 +1,3 @@
-#ENV["PYCALL_JL_RUNTIME_PYTHON"]="/home/arnau/Documents/qwind/env/bin/python"
 using PyCall
 export GridsStruct, BlackHoleStruct, RadiationStruct, StreamlineStruct, WindStruct
 
@@ -20,6 +19,7 @@ struct GridsStruct
     mdot::Array{Float64,1}
     uv_fractions::Array{Float64,1}
 end
+
 struct BlackHoleStruct
     M::Float64
     mdot::Float64
@@ -39,6 +39,7 @@ struct RadiationStruct
     xray_luminosity::Float64
     force_constant::Float64
 end
+
 struct WindStruct
     config::Dict
     bh::BlackHoleStruct
@@ -66,10 +67,10 @@ mutable struct StreamlineStruct
     is_first_iter::Bool
     u_hist::Array{Float64,2}
     n_hist::Array{Float64,1}
+    tau_x_hist::Array{Float64,1}
     fm_hist::Array{Float64,1}
     xi_hist::Array{Float64,1}
     dv_dr_hist::Array{Float64,1}
     a_r_hist::Array{Float64,1}
     a_z_hist::Array{Float64,1}
 end
-#end

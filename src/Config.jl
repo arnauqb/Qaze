@@ -25,8 +25,13 @@ function initialize(config::Dict)
     r_max = config["grids"]["r_max"]
     z_max = config["grids"]["z_max"]
     n_lines = config["wind"]["number_streamlines"]
-    r_range = 10 .^(range(log10(r_min), stop=log10(r_max), length=n_r))
-    z_range = 10 .^(range(log10(z_min), stop=log10(z_max), length=n_z))
+    if config["grids"]["log_spaced"]
+        r_range = 10 .^(range(log10(r_min), stop=log10(r_max), length=n_r))
+        z_range = 10 .^(range(log10(z_min), stop=log10(z_max), length=n_z))
+    else
+        r_range = range(r_min, stop=r_max, length=n_r)
+        z_range = range(z_min, stop=z_max, length=n_z)
+    end
     disk_range = 10 .^(range(log10(disk_r_min), stop=log10(disk_r_max), length=n_disk))
     lines_initial_radius = config["wind"]["initial_radius"]
     lines_final_radius = config["wind"]["final_radius"]
@@ -51,7 +56,7 @@ function initialize(config::Dict)
         sqrt(r_max^2 + z_max^2), # d_max
         disk_range,
         config["wind"]["n_shielding"] * ones(Float64, n_r, n_z), #density
-        zeros(Float64, n_lines, n_r, n_z), # fm lines
+        zeros(Float64, n_lines, n_r, n_z), # density lines
         zeros(Float64, n_r, n_z), #tau_x
         zeros(Float64, n_r, n_z), #ionization
         zeros(Float64, n_r, n_z), #fm
