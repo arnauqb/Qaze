@@ -30,7 +30,6 @@ function start_lines(wind::WindStruct)
         for (i, r) in enumerate(wind.lines_range)
             if !is_first_iter
                 erase_line_from_grid(i, wind)
-                continue
             end
             line = initialize_line(i, r, wind, is_first_iter)
             wind.lines[i] = line
@@ -38,7 +37,9 @@ function start_lines(wind::WindStruct)
             solve!(line)
             write_line(wind.config["general"]["save_path"], line.p, it_num)
         end
-        update_mdot_grid(wind)
+        if wind.config["general"]["consistent_mdot"]
+            update_mdot_grid(wind)
+        end
         write_properties_and_grids(wind.config["general"]["save_path"], wind, it_num)
         is_first_iter = false
     end

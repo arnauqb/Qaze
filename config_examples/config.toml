@@ -55,3 +55,4 @@ z_0 = 1.0
 solver_rtol = 1e-2
 gravity_only = false 
 nofm = false
+consistent_mdot = false
