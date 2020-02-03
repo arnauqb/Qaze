@@ -49,24 +49,27 @@ function compute_tau_x(r, z, wind::WindStruct)
     line_coords = drawline(1,1,r_arg,z_arg)
     tau = 0.
     tau_length = size(line_coords)[1]
-    for k in 1:tau_length
+    for k in 1:(tau_length-1)
         row = line_coords[k,:]
         i, j = row
-        rp = wind.grids.r_range[i]
-        zp = wind.grids.z_range[j]
-        d = sqrt(rp^2 + zp^2) * wind.bh.R_g
+        rp1 = wind.grids.r_range[i]
+        rp2 = wind.grids.r_range[i+1]
+        zp1 = wind.grids.z_range[j]
+        zp2 = wind.grids.z_range[j+1]
+        d2 = sqrt(rp2^2 + zp2^2) * wind.bh.R_g
+        delta_d = sqrt((rp2-rp1)^2 + (zp2-zp1)^2) * wind.bh.R_g
         density = wind.grids.density[i,j]
         #println("r: $rp z :$zp den: $density")
-        xi0 = wind.radiation.xray_luminosity / (density * d^2)
+        xi0 = wind.radiation.xray_luminosity / (density * d2^2)
         xi = xi0
         for dummy in 1:2
-            tau_prov = (tau + density * opacity_x(xi)) * d / k * SIGMA_T
+            dtau = density * opacity_x(xi) * delta_d * SIGMA_T
+            tau_prov = tau + dtau
             xi = xi0 * exp(-tau_prov)
         end
-        tau = tau + (density * opacity_x(xi))
+        tau = tau + density * opacity_x(xi) * delta_d * SIGMA_T
     end
-    d = sqrt(r^2 + z^2) * wind.bh.R_g
-    tau =  tau / tau_length *  SIGMA_T * d
+    #d = sqrt(r^2 + z^2) * wind.bh.R_g
     @assert tau >= 0
     return tau
 end

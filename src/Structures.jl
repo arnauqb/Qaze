@@ -40,7 +40,7 @@ struct RadiationStruct
     force_constant::Float64
 end
 
-struct WindStruct
+mutable struct WindStruct
     config::Dict
     bh::BlackHoleStruct
     sed::PyObject

@@ -16,10 +16,10 @@ function initialize_line(line_id, r_0, z_0, v_0, n_0, v_th, wind::WindStruct, is
     a_r_0, a_z_0, fm, xi, dv_dr, tau_x = compute_initial_acceleration(r_0, z_0, v_0, n_0, v_th, l, wind, is_first_iter)
     u0 = [r_0, z_0, 0., v_0]
     du0 = [0., v_0, a_r_0, a_z_0]
-    lw = wind.lines_widths[line_id]
+    lw0 = wind.lines_widths[line_id]
     u_hist = reshape(u0, (1,4))
     line = StreamlineStruct(wind, line_id, r_0, z_0, v_0, v_phi_0, n_0,
-                            v_th, l, lw, false, 0, is_first_iter, u_hist,
+                            v_th, l, lw0, false, 0, is_first_iter, u_hist,
                             [n_0], [tau_x], [fm], [xi], [dv_dr], [a_r_0], [a_z_0])
     tspan = (0., 1e8)
     termination_cb = DiscreteCallback(condition, affect, save_positions=(false, false))
@@ -124,10 +124,11 @@ function save(u, t, integrator)
     tau_eff = compute_tau_eff(n, dv_dr, integrator.p.v_th)
     fm = force_multiplier(tau_eff, xi)
     r_0, z_0, v_r_0, v_z_0 = integrator.p.u_hist[end,:]
+    lw = integrator.p.line_width / integrator.p.r_0 * r
     if integrator.p.wind.config["radiation"]["tau_uv_include_fm"]
-        update_density_and_fm_lines(r_0, r, z_0, z, integrator.p.line_width, n, fm, integrator.p.line_id, integrator.p.wind)
+        update_density_and_fm_lines(r_0, r, z_0, z, lw, n, fm, integrator.p.line_id, integrator.p.wind)
     else
-        update_density_and_fm_lines(r_0, r, z_0, z, integrator.p.line_width, n, 0., integrator.p.line_id, integrator.p.wind)
+        update_density_and_fm_lines(r_0, r, z_0, z, lw, n, 0., integrator.p.line_id, integrator.p.wind)
     end
     integrator.p.u_hist = [integrator.p.u_hist ; transpose(u)]
     push!(integrator.p.fm_hist, fm)

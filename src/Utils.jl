@@ -1,6 +1,11 @@
-export drawline, get_index, initialize_json, write_line, write_properties_and_grids
+export logrange, drawline, get_index, initialize_json, write_line, write_properties_and_grids
 using JSON
 using Printf
+
+function logrange(start, stop, length)
+    log_range = range(log10(start), stop=log10(stop), length=length)
+    return 10 .^log_range
+end
 
 function drawline(x1::Int64, y1::Int64, x2::Int64, y2::Int64)
     x=x1
@@ -45,7 +50,7 @@ function drawline(x1::Int64, y1::Int64, x2::Int64, y2::Int64)
 end
 
 function get_index(array, value)
-    return max(searchsortedlast(array, value), 1)
+    return min(searchsortedfirst(array, value), length(array))
 end
 
 function initialize_json(json_file, wind::WindStruct)
@@ -120,7 +125,7 @@ function write_properties_and_grids(json_file, wind::WindStruct, it_num)
         "kin_lumin_norm" => kin_lumin / eddington_luminosity(wind.bh),
     )
     println("\n updating tau_x and xi grid...")
-    update_taux_and_xi_grid(wind)
+    #update_taux_and_xi_grid(wind)
     #wind.grid.tau_x_grid.update_all()
     #print("updating ionization grid...")
     #wind.grid.ionization_grid.update_all()
