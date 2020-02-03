@@ -37,7 +37,7 @@ function start_lines(wind::WindStruct)
             solve!(line)
             write_line(wind.config["general"]["save_path"], line.p, it_num)
         end
-        if wind.config["general"]["consistent_mdot"]
+        if wind.config["wind"]["consistent_mdot"]
             update_mdot_grid(wind)
         end
         write_properties_and_grids(wind.config["general"]["save_path"], wind, it_num)

@@ -25,6 +25,8 @@ function initialize(config::Dict)
     r_max = config["grids"]["r_max"]
     z_max = config["grids"]["z_max"]
     n_lines = config["wind"]["number_streamlines"]
+    qsosed = pyimport("qsosed")
+    sed = qsosed.SED(M=M, mdot=mdot, number_bins_fractions=n_disk)
     if config["grids"]["log_spaced"]
         r_range = 10 .^(range(log10(r_min), stop=log10(r_max), length=n_r))
         z_range = 10 .^(range(log10(z_min), stop=log10(z_max), length=n_z))
@@ -34,6 +36,9 @@ function initialize(config::Dict)
     end
     disk_range = 10 .^(range(log10(disk_r_min), stop=log10(disk_r_max), length=n_disk))
     lines_initial_radius = config["wind"]["initial_radius"]
+    if lines_initial_radius == "warm_radius"
+        lines_initial_radius = sed.warm_radius
+    end
     lines_final_radius = config["wind"]["final_radius"]
     if config["wind"]["log_spaced"]
         dlogr = (log10(lines_final_radius) - log10(lines_initial_radius)) / n_lines
@@ -64,8 +69,6 @@ function initialize(config::Dict)
         mdot .* ones(Float64, n_disk), #mdot
         ones(Float64, n_disk), #uv fraction
     )
-    qsosed = pyimport("qsosed")
-    sed = qsosed.SED(M=M, mdot=mdot, number_bins_fractions=n_disk)
     edd_lumin = eddington_luminosity(bh)
     f_uv = config["radiation"]["f_uv"]
     f_x = config["radiation"]["f_x"]
