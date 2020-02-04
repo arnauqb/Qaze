@@ -42,6 +42,7 @@ function initialize_grids(config::Dict, qsosed)
     return grids
 end
 
+#=
 function refine_density_grid(r_range_old, r_range_new, z_range_old, z_range_new, density_old)
     n_r = length(r_range_new)
     n_z = length(z_range_new)
@@ -191,6 +192,7 @@ function refine_density_grid(wind::WindStruct)
     #fill_density_and_fm_grid(wind)
     return nothing
 end
+=#
 
 function fill_density_and_fm_grid(wind::WindStruct)
     for (line_id, line) in enumerate(wind.lines)

@@ -50,7 +50,7 @@ function drawline(x1::Int64, y1::Int64, x2::Int64, y2::Int64)
 end
 
 function get_index(array, value)
-    return min(searchsortedfirst(array, value), length(array))
+    return max(searchsortedfirst(array, value) - 1, 1)
 end
 
 function initialize_json(json_file, wind::WindStruct)
@@ -144,3 +144,4 @@ function write_properties_and_grids(json_file, wind::WindStruct, it_num)
         JSON.print(f,data)
     end
 end
+

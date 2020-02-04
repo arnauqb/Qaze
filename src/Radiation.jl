@@ -1,5 +1,5 @@
 export thermal_velocity, eddington_luminosity, initialize_uv_fraction, nt_rel_factors, opacity_x, compute_tau_x, ionization_parameter,
-       compute_tau_eff, force_multiplier, force_radiation
+       compute_tau_eff, force_multiplier, force_radiation, compute_tau_x_l33t
 
 function thermal_velocity(T, mu = 1.)
     v = sqrt(K_B * T / (mu * M_P)) / C
@@ -43,19 +43,24 @@ function opacity_x(xi)
     end
 end
 
-function compute_tau_x(r, z, wind::WindStruct)
+function compute_tau_x_old(r, z, wind::WindStruct)
     r_arg = get_index(wind.grids.r_range, r)
     z_arg = get_index(wind.grids.z_range, z)
-    line_coords = drawline(1,1,max(1, r_arg-1),max(1,z_arg-1))
+    line_coords = drawline(1,1, r_arg, z_arg)
+    println("r: $r, z: $z")
+    println(line_coords)
     tau = 0.
     tau_length = size(line_coords)[1]
+    #println("r: $r, z: $z")
+    #println(line_coords)
     for k in 1:(tau_length-1)
         row = line_coords[k,:]
         i, j = row
         rp1 = wind.grids.r_range[i]
-        rp2 = wind.grids.r_range[i+1]
+        rp2 = wind.grids.r_range[min(i+1, wind.grids.n_r)]
         zp1 = wind.grids.z_range[j]
-        zp2 = wind.grids.z_range[j+1]
+        zp2 = wind.grids.z_range[min(j+1, wind.grids.n_z)]
+        println("rp1: $rp1 rp2: $rp2, zp1: $zp1, zp2: $zp2")
         d2 = sqrt(rp2^2 + zp2^2) * wind.bh.R_g
         delta_d = sqrt((rp2-rp1)^2 + (zp2-zp1)^2) * wind.bh.R_g
         density = wind.grids.density[i,j]
@@ -67,10 +72,71 @@ function compute_tau_x(r, z, wind::WindStruct)
             tau_prov = tau + dtau
             xi = xi0 * exp(-tau_prov)
         end
+        println(delta_d / wind.bh.R_g)
         tau = tau + density * opacity_x(xi) * delta_d * SIGMA_T
     end
     #d = sqrt(r^2 + z^2) * wind.bh.R_g
     @assert tau >= 0
+    return tau
+end
+
+function compute_tau_x(r, z, wind::WindStruct)
+    r1 = 0.
+    z1 = 0.
+    r_arg = get_index(wind.grids.r_range, r)
+    z_arg = get_index(wind.grids.z_range, z)
+    m = z / r 
+    deltad = 0.
+    r2 = wind.grids.r_range[1]
+    z2 = m * r2
+    tau = sqrt(r2^2 + z2^2) * wind.bh.R_g * SIGMA_T * wind.config["wind"]["n_shielding"]
+    rp_arg = 1
+    zp_arg = get_index(wind.grids.z_range, z2)
+    while ((rp_arg < r_arg) && (zp_arg < z_arg))
+        density = wind.grids.density[rp_arg, zp_arg]
+        r2_candidate = wind.grids.r_range[rp_arg + 1]
+        z2_candidate = wind.grids.z_range[zp_arg + 1]
+        lambda_r = (r2_candidate - r1) / r
+        lambda_z = (z2_candidate - z1) / z
+        if lambda_r < lambda_z
+            rp_arg += 1
+            r2 = wind.grids.r_range[rp_arg]
+            z2 = m * r2 
+        elseif lambda_r == lambda_z
+            rp_arg += 1
+            zp_arg += 1
+            r2 = wind.grids.r_range[rp_arg]
+            z2 = wind.grids.z_range[zp_arg]
+        elseif lambda_r > lambda_z
+            zp_arg += 1
+            z2 = wind.grids.z_range[zp_arg]
+            r2 = z2 / m
+        end
+        deltad = sqrt((r2-r1)^2 + (z2-z1)^2) * wind.bh.R_g
+        d2 = (r2^2 + z2^2) * wind.bh.R_g^2
+        xi0 = wind.radiation.xray_luminosity / (density * d2)
+        xi = xi0
+        for dummy in 1:2
+            dtau = density * opacity_x(xi) * deltad * SIGMA_T
+            tau_prov = tau + dtau
+            xi = xi0 * exp(-tau_prov)
+        end
+        r1 = r2
+        z1 = z2
+        tau += density * SIGMA_T * deltad * opacity_x(xi)
+    end
+    # add last bit
+    density = wind.grids.density[r_arg, z_arg]
+    deltad = sqrt((r-r1)^2 + (z-z1)^2) * wind.bh.R_g
+    d2 = (r^2 + z^2) * wind.bh.R_g^2
+    xi0 = wind.radiation.xray_luminosity / (density * d2)
+    xi = xi0
+    for dummy in 1:2
+        dtau = density * opacity_x(xi) * deltad * SIGMA_T
+        tau_prov = tau + dtau
+        xi = xi0 * exp(-tau_prov)
+    end
+    tau += density * SIGMA_T * deltad * opacity_x(xi)
     return tau
 end
 
