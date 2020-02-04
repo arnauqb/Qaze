@@ -3,6 +3,60 @@ using Cubature
 #using HCubature
 
 function tau_uv_disk_blob(wind::WindStruct, r_d, phi_d, r, z)
+    rp_arg = get_index(wind.grids.r_range, r_d)
+    zp_arg = get_index(wind.grids.z_range, 0.)
+    r_arg = get_index(wind.grids.r_range, r)
+    z_arg = get_index(wind.grids.z_range, z)
+    compute_rp(zp) = zp * (r - r_d) / z + r_d
+    compute_zp(rp) = z / (r - r_d)  * (rp - r_d)
+    deltad = 0.
+    r1 = r_d
+    z1 = 0.
+    tau = 0.
+    #r_list = [r1]
+    #z_list = [z1]
+    step_r = convert(Int, sign(r - r_d))
+    while ((rp_arg != r_arg) && (zp_arg != z_arg))
+        density = wind.grids.density[rp_arg, zp_arg]
+        fm = wind.grids.fm[rp_arg, zp_arg]
+        r2_candidate = wind.grids.r_range[rp_arg + step_r]
+        z2_candidate = wind.grids.z_range[zp_arg + 1]
+        lambda_r = (r2_candidate - r1) / r
+        lambda_z = (z2_candidate - z1) / z
+        if lambda_r < lambda_z
+            rp_arg += step_r
+            r2 = wind.grids.r_range[rp_arg]
+            z2 = compute_zp(r2) 
+        elseif lambda_r == lambda_z
+            rp_arg += step_r
+            zp_arg += 1
+            r2 = wind.grids.r_range[rp_arg]
+            z2 = wind.grids.z_range[zp_arg]
+        elseif lambda_r > lambda_z
+            zp_arg += 1
+            z2 = wind.grids.z_range[zp_arg]
+            r2 = compute_rp(z2)
+        end
+        deltad = sqrt((r2-r1)^2 + (z2-z1)^2) * wind.bh.R_g
+        d2 = (r2^2 + z2^2) * wind.bh.R_g^2
+        r1 = r2
+        z1 = z2
+        #push!(r_list, r1)
+        #push!(z_list, z1)
+        tau += density * SIGMA_T * (1 + fm) * deltad 
+    end
+    # add last bit
+    density = wind.grids.density[r_arg, z_arg]
+    fm = wind.grids.fm[r_arg, z_arg]
+    deltad = sqrt((r-r1)^2 + (z-z1)^2) * wind.bh.R_g
+    d2 = (r^2 + z^2) * wind.bh.R_g^2
+    #push!(r_list, r)
+    #push!(z_list, z)
+    tau += density * SIGMA_T * deltad * (1 + fm) 
+    return tau 
+end
+
+function tau_uv_disk_blob_old(wind::WindStruct, r_d, phi_d, r, z)
     grids = wind.grids
     line_length = sqrt(r^2 + r_d^2 + z^2 - 2 * r * r_d * cos(phi_d))
     r_arg = get_index(grids.r_range, r)
