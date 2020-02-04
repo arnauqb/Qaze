@@ -10,15 +10,15 @@ function tau_uv_disk_blob(wind::WindStruct, r_d, phi_d, r, z)
     r_d_arg = get_index(grids.r_range, r_d)
     dr = abs(r_arg - r_d_arg)
     dz = abs(z_arg - 1)
-    length = max(dr, dz) + 1
-    line_coords = drawline(r_d_arg, 1, r_arg, z_arg)
+    line_arg_length = max(dr, dz) + 1
+    line_coords = drawline(r_d_arg, 1, max(r_arg-1,1), max(z_arg-1,1))
     tau = 0.
-    for row in eachrow(line_coords[1:length-1, :])
+    for row in eachrow(line_coords)
         i,j = row
-        r1 = wind.grids.r_range[i]r
-        r2 = wind.grids.r_range[i+1]
+        r1 = wind.grids.r_range[i]
+        r2 = wind.grids.r_range[min(i+1, wind.grids.n_r)]
         z1 = wind.grids.z_range[j]
-        z2 = wind.grids.z_range[j+1]
+        z2 = wind.grids.z_range[min(j+1, wind.grids.n_z)]
         delta_d = sqrt((r2-r1)^2 + (z2-z1)^2) * wind.bh.R_g
         density = grids.density[i,j]
         fm = grids.fm[i,j]

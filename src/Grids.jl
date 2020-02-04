@@ -42,6 +42,37 @@ function initialize_grids(config::Dict, qsosed)
     return grids
 end
 
+function refine_density_grid(r_range_old, r_range_new, z_range_old, z_range_new, density_old)
+    n_r = length(r_range_new)
+    n_z = length(z_range_new)
+    density_new  = zeros(Float64, n_r, n_z)
+    for i in 1:n_r
+        r = r_range_new[i]
+        r_old_arg = searchsortedfirst(r_range_old, r)
+        for j in 1:n_z
+            z = z_range_new[j]
+            z_old_arg = searchsortedfirst(z_range_old, z)
+            density_interp = 0.
+            counter = 0
+            for k1 in 0:2
+                if (r_old_arg + k1) > length(r_range_old)
+                    continue
+                end
+                for k2 in -1:1
+                    if ((z_old_arg + k2) > length(z_range_old) || (z_old_arg + k2) < 1)
+                        continue
+                    end
+                    density_interp += log10(density_old[r_old_arg + k1, z_old_arg + k2])
+                    counter += 1
+                end
+            end
+            density_interp = 10^(density_interp / counter)
+            density_new[i,j] = density_interp
+        end
+    end
+    return density_new
+end
+
 function refine_density_grid(wind::WindStruct)
     println("Computing optical depths ...")
     delta_taus = zeros(Float64, wind.grids.n_r, wind.grids.n_z)
@@ -58,39 +89,95 @@ function refine_density_grid(wind::WindStruct)
         end
     end
     println("refining grid...")
-    opt_thick = findall(x -> x>0.1, delta_taus)
-    if length(opt_thick) == 0
+    opt_thick_locations = findall(x -> x>0.1, delta_taus)
+    if length(opt_thick_locations) == 0
         println("nothing to refine")
         return nothing
     end
-    r_min_arg, z_min_arg = Tuple(opt_thick[1])
-    r_max_arg, z_max_arg = Tuple(opt_thick[end])
-    z_max = wind.grids.z_range[z_max_arg]
-    z_min = wind.grids.z_range[z_min_arg]
-    r_max = wind.grids.r_range[r_max_arg]
-    r_min = wind.grids.r_range[r_min_arg]
-    # r part
-    nr = r_max_arg - r_min_arg 
-    r_range_old = wind.grids.r_range
-    r_refined_0 = logrange(r_min, r_max, 2 * (nr + 1) )
-    r_range = [wind.grids.r_range[1:r_min_arg-1] ; r_refined_0 ; wind.grids.r_range[r_max_arg+1:end]]
-    newsize_r = length(r_range)
-    # z part
-    nz = z_max_arg - z_min_arg 
-    z_range_old = wind.grids.z_range
-    z_refined_0 = logrange(z_min, z_max, 2 * (nz + 1) )
-    z_range = [wind.grids.z_range[1:z_min_arg-1] ; z_refined_0 ; wind.grids.z_range[z_max_arg+1:end]]
-    newsize_z = length(z_range)
+    r_range_new = copy(wind.grids.r_range)
+    z_range_new = copy(wind.grids.z_range)
+    r_arg_list = []
+    z_arg_list = []
+    for (i, row) in enumerate(eachrow(opt_thick_locations))
+        r_arg, z_arg = Tuple(row[1])
+        if i == 1
+            push!(r_arg_list, r_arg)
+            push!(z_arg_list, z_arg)
+        else
+            if !(r_arg == r_arg_list[end])
+                push!(r_arg_list, r_arg)
+            end
+            if !(z_arg == z_arg_list[end])
+                push!(z_arg_list, z_arg)
+            end
+        end
+    end
+    elements_attached = 0
+    for r_arg in r_arg_list
+        if r_arg == 1
+            r = wind.grids.r_range[1]
+            rnext = wind.grids.r_range[2]
+            r2 = r + (rnext - r) / 2.
+            insert!(r_range_new, 2, r2)
+            elements_attached += 1
+            continue
+        end
+        r_arg_corr = r_arg + elements_attached
+        r = r_range_new[r_arg_corr]
+        rprevious = r_range_new[r_arg_corr - 1]
+        rnext = r_range_new[r_arg_corr + 1]
+        if wind.config["grids"]["log_spaced"]
+            r1 = rprevious + 10^((log10(r) - log10(rprevious))/ 2.)
+            r2 = r + 10^((log10(rnext) - log10(r))/ 2.)
+        else
+            r1 = rprevious + (r - rprevious) / 2.
+            r2 = r + (rnext - r) / 2.
+        end
+        deleteat!(r_range_new, r_arg_corr)
+        insert!(r_range_new, r_arg_corr, r1)
+        insert!(r_range_new, r_arg_corr+1, r2)
+        #println("r: $r, $rnext, $r2")
+        elements_attached += 1
+    end
+    elements_attached = 0
+    for z_arg in z_arg_list
+        if z_arg == 1
+            z = wind.grids.z_range[1]
+            znext = wind.grids.z_range[2]
+            z2 = z + (znext - z) / 2.
+            insert!(z_range_new, 2, z2)
+            elements_attached += 1
+            continue
+        end
+        z_arg_corr = z_arg + elements_attached
+        z = z_range_new[z_arg_corr]
+        zprevious = z_range_new[z_arg_corr - 1]
+        znext = z_range_new[z_arg_corr + 1]
+        if wind.config["grids"]["log_spaced"]
+            z1 = zprevious + 10^((log10(z) - log10(zprevious))/ 2.)
+            z2 = z + 10^((log10(znext) - log10(z))/ 2.)
+        else
+            z1 = zprevious + (z - zprevious) / 2.
+            z2 = z + (znext - z) / 2.
+        end
+        deleteat!(z_range_new, z_arg_corr)
+        insert!(z_range_new, z_arg_corr, z1)
+        insert!(z_range_new, z_arg_corr+1, z2)
+        elements_attached += 1
+    end
+    newsize_r = length(r_range_new)
+    newsize_z = length(z_range_new)
+    density_new = refine_density_grid(wind.grids.r_range, r_range_new, wind.grids.z_range, z_range_new, wind.grids.density)
     grids = GridsStruct(
         newsize_r,
         newsize_z,
         wind.grids.n_disk,
         wind.grids.n_lines,
-        r_range,
-        z_range,
+        r_range_new,
+        z_range_new,
         sqrt(wind.grids.r_range[end]^2 + wind.grids.z_range[end]^2), # d_max
         wind.grids.disk_range,
-        wind.config["wind"]["n_shielding"] * ones(Float64, newsize_r, newsize_z), #density
+        density_new, #wind.config["wind"]["n_shielding"] * ones(Float64, newsize_r, newsize_z), #density
         zeros(Float64, wind.grids.n_lines, newsize_r, newsize_z), # density lines
         zeros(Float64, newsize_r, newsize_z), #tau_x
         zeros(Float64, newsize_r, newsize_z), #ionization
@@ -100,8 +187,8 @@ function refine_density_grid(wind::WindStruct)
         ones(Float64, wind.grids.n_disk), #uv fraction
     )
     wind.grids = grids
-    println("filling grids...")
-    fill_density_and_fm_grid(wind)
+    #println("filling grids...")
+    #fill_density_and_fm_grid(wind)
     return nothing
 end
 

@@ -46,7 +46,7 @@ end
 function compute_tau_x(r, z, wind::WindStruct)
     r_arg = get_index(wind.grids.r_range, r)
     z_arg = get_index(wind.grids.z_range, z)
-    line_coords = drawline(1,1,r_arg,z_arg)
+    line_coords = drawline(1,1,max(1, r_arg-1),max(1,z_arg-1))
     tau = 0.
     tau_length = size(line_coords)[1]
     for k in 1:(tau_length-1)
