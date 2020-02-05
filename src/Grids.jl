@@ -1,5 +1,5 @@
 export initialize_grids, update_density_and_fm_lines, erase_line_from_grid,
-    update_mdot_grid, update_taux_and_xi_grid, refine_density_grid, fill_density_and_fm_grid
+    update_mdot_grid, update_taux_and_xi_grid, refine_density_grid, fill_density_and_fm_grid, compute_tau_uv_grid
 using Statistics
 
 function initialize_grids(config::Dict, qsosed)
@@ -305,3 +305,13 @@ function update_taux_and_xi_grid(wind::WindStruct)
     return nothing
 end
 
+function compute_tau_uv_grid(r_d, phi_d, wind::WindStruct)
+    grid = zeros(Float64, wind.grids.n_r, wind.grids.n_z)
+    for (i, r) in enumerate(wind.grids.r_range)
+        for (j, z) in enumerate(wind.grids.z_range)
+            tauuv = tau_uv_disk_blob(wind, r_d, phi_d, r, z)
+            grid[i, j] = tauuv
+        end
+    end
+    return grid
+end

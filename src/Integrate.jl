@@ -2,7 +2,7 @@ export tau_uv_disk_blob, integrate_kernel, integrate_notau_kernel, integrate
 using Cubature
 #using HCubature
 
-function tau_uv_disk_blob(wind::WindStruct, r_d, phi_d, r, z)
+function tau_uv_disk_blob(wind::WindStruct, r_d, phi_d, r, z, return_list=false)
     if (z==0.)
         return 0
     end
@@ -17,8 +17,11 @@ function tau_uv_disk_blob(wind::WindStruct, r_d, phi_d, r, z)
     r1 = r_d
     z1 = 0.
     tau = 0.
+    r_list = [r1]
+    z_list = [z1]
     step_r = convert(Int, sign(r - r_d))
-    while ((rp_arg < r_arg) && (zp_arg < z_arg))
+    println("$rp_arg $r_arg $zp_arg $z_arg")
+    while ((rp_arg != r_arg) && (zp_arg != z_arg))
         density = wind.grids.density[rp_arg, zp_arg]
         fm = wind.grids.fm[rp_arg, zp_arg]
         if rd_arg ==  r_arg
@@ -27,11 +30,16 @@ function tau_uv_disk_blob(wind::WindStruct, r_d, phi_d, r, z)
             deltad = (z2-z1) * wind.bh.R_g
             z1 = z2
             tau += density * SIGMA_T * (1 + fm) * deltad
+            push!(r_list, r1)
+            push!(r_list, z1)
         else
             r2_candidate = wind.grids.r_range[rp_arg + step_r]
             z2_candidate = wind.grids.z_range[zp_arg + 1]
+            println(r2_candidate)
+            println(z2_candidate)
             lambda_r = (r2_candidate - r1) / (r - r_d)
-            lambda_z = z2_candidate - z1 / z
+            lambda_z = (z2_candidate - z1) / z
+            println("lambdar : $lambda_r lambda_z : $lambda_z")
             if lambda_r < lambda_z
                 r2 = r2_candidate 
                 z2 = compute_zp(r2)
@@ -49,6 +57,8 @@ function tau_uv_disk_blob(wind::WindStruct, r_d, phi_d, r, z)
             deltad = sqrt((r2-r1)^2 + (z2-z1)^2) * wind.bh.R_g
             r1 = r2
             z1 = z2
+            push!(r_list, r1)
+            push!(z_list, z1)
             tau += density * SIGMA_T * (1 + fm) * deltad 
         end
     end
@@ -58,9 +68,15 @@ function tau_uv_disk_blob(wind::WindStruct, r_d, phi_d, r, z)
     deltad = sqrt((r-r1)^2 + (z-z1)^2) * wind.bh.R_g
     tau += density * SIGMA_T * deltad * (1 + fm) 
     # normalize
+    push!(r_list, r)
+    push!(z_list, z)
     delta = sqrt(r^2 + z^2 + r_d^2 - 2 * r * r_d * cos(phi_d))
     tau = tau / sqrt((r-r_d)^2 + z^2) * delta
-    return tau
+    if return_list
+        return tau, r_list, z_list
+    else
+        return tau
+    end
 end
 
 function tau_uv_disk_blob_old(wind::WindStruct, r_d, phi_d, r, z)

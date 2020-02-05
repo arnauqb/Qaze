@@ -21,11 +21,12 @@ end
 function start_lines(wind::WindStruct)
     is_first_iter = true
     for it_num in 1:wind.config["wind"]["iterations"]
-        if !is_first_iter
-            wind.grids.density_lines[:,:,:] .= 0.
-            wind.grids.density[:,:] .= wind.config["wind"]["n_shielding"]
-            wind.grids.fm_lines[:,:,:] .= 0.
-            wind.grids.fm[:,:] .= 0.
+        wind.grids.density_lines[:,:,:] .= 0.
+        wind.grids.density[:,:] .= wind.config["wind"]["n_shielding"]
+        wind.grids.fm_lines[:,:,:] .= 0.
+        wind.grids.fm[:,:] .= 0.
+        if it_num >= 3
+            update_mdot_grid(wind)
         end
         for (i, r) in enumerate(wind.lines_range)
             if !is_first_iter
@@ -36,9 +37,6 @@ function start_lines(wind::WindStruct)
             print("\nSolving line $i of $(length(wind.lines))")
             solve!(line)
             write_line(wind.config["general"]["save_path"], line.p, it_num)
-        end
-        if wind.config["wind"]["consistent_mdot"]
-            update_mdot_grid(wind)
         end
         write_properties_and_grids(wind.config["general"]["save_path"], wind, it_num)
         is_first_iter = false
