@@ -14,8 +14,10 @@ end
 end
 
 @testset "X-ray optical depth" begin
-    r_range = [10, 10, 50, 100, 900]
-    z_range = [5, 5, 20, 800, 5]
+    #r_range = [10, 10, 50, 100, 900]
+    #z_range = [5, 5, 20, 800, 5]
+    r_range = range(1, stop=1000, length=50)
+    z_range = range(1e-4, stop=1000, length=50)
     tau_truth = wind.config["wind"]["n_shielding"] * sqrt.(r_range .^2 + z_range .^2) * SIGMA_T * wind.bh.R_g
     f(r,z) = compute_tau_x(r, z, wind)
     @test f.(r_range, z_range) ≈ tau_truth rtol=1e-4 atol=0
@@ -41,8 +43,8 @@ end
 end
 
 @testset "Force radiation" begin
-    @test force_radiation(100., 50., 0., wind, include_tau_uv=false) .≈ [5e-6, 4.2e-6] atol = 0 rtol = 0.1
-    @test force_radiation(5., 10., 0., wind, include_tau_uv=false) .≈ [-7e-6, 6e-5] atol = 0 rtol = 0.1
-    @test force_radiation(1000., 0.1, 0., wind, include_tau_uv=false) .≈ [1.9e-11, 9e-11] atol = 0 rtol = 0.2
+    @test all(isapprox.(force_radiation(100., 50., 0., wind, include_tau_uv=false), [5e-6, 4.2e-6], atol=0, rtol=0.1))
+    @test all(isapprox.(force_radiation(5., 10., 0., wind, include_tau_uv=false), [-7e-6, 6e-5], atol=0, rtol=0.1))
+    @test all(isapprox.(force_radiation(1000., 0.1, 0., wind, include_tau_uv=false), [1.9e-11, 9e-11], atol=0, rtol=0.2))
 end
 

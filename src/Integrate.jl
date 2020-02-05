@@ -3,61 +3,64 @@ using Cubature
 #using HCubature
 
 function tau_uv_disk_blob(wind::WindStruct, r_d, phi_d, r, z)
+    if (z==0.)
+        return 0
+    end
     rp_arg = get_index(wind.grids.r_range, r_d)
+    rd_arg = get_index(wind.grids.r_range, r_d)
     zp_arg = get_index(wind.grids.z_range, 0.)
     r_arg = get_index(wind.grids.r_range, r)
     z_arg = get_index(wind.grids.z_range, z)
-    compute_rp(zp) = zp * (r - r_d) / z + r_d
+    compute_rp(zp) = r_d + (zp / z * (r - r_d))
     compute_zp(rp) = z / (r - r_d)  * (rp - r_d)
     deltad = 0.
     r1 = r_d
     z1 = 0.
-    phi1 = phi_d
     tau = 0.
-    cos_aux = r_d * cos(phi_d)
-    lambda = 0.
     step_r = convert(Int, sign(r - r_d))
-    while ((rp_arg != r_arg) && (zp_arg != z_arg))
+    while ((rp_arg < r_arg) && (zp_arg < z_arg))
         density = wind.grids.density[rp_arg, zp_arg]
         fm = wind.grids.fm[rp_arg, zp_arg]
-        r2_candidate = wind.grids.r_range[rp_arg + step_r]
-        z2_candidate = wind.grids.z_range[zp_arg + 1]
-        lambda_r = (r2_candidate - r1) / r
-        lambda_z = (z2_candidate - z1) / z
-        if lambda_r < lambda_z
-            lambda = lambda_r
-            rp_arg += step_r
-            r2 = wind.grids.r_range[rp_arg]
-            z2 = compute_zp(r2) 
-        elseif lambda_r == lambda_z
-            lambda = lambda_r
-            rp_arg += step_r
-            zp_arg += 1
-            r2 = wind.grids.r_range[rp_arg]
-            z2 = wind.grids.z_range[zp_arg]
-        elseif lambda_r > lambda_z
-            lambda = lambda_z
+        if rd_arg ==  r_arg
             zp_arg += 1
             z2 = wind.grids.z_range[zp_arg]
-            r2 = compute_rp(z2)
+            deltad = (z2-z1) * wind.bh.R_g
+            z1 = z2
+            tau += density * SIGMA_T * (1 + fm) * deltad
+        else
+            r2_candidate = wind.grids.r_range[rp_arg + step_r]
+            z2_candidate = wind.grids.z_range[zp_arg + 1]
+            lambda_r = (r2_candidate - r1) / (r - r_d)
+            lambda_z = z2_candidate - z1 / z
+            if lambda_r < lambda_z
+                r2 = r2_candidate 
+                z2 = compute_zp(r2)
+                rp_arg += step_r
+            elseif lambda_r == lambda_z
+                r2 = r2_candidate 
+                z2 = z2_candidate 
+                rp_arg += step_r
+                zp_arg += 1
+            elseif lambda_r > lambda_z
+                z2 = z2_candidate 
+                r2 = compute_rp(z2)
+                zp_arg += 1
+            end
+            deltad = sqrt((r2-r1)^2 + (z2-z1)^2) * wind.bh.R_g
+            r1 = r2
+            z1 = z2
+            tau += density * SIGMA_T * (1 + fm) * deltad 
         end
-        cosphi_p = 1 / r2 * (cos_aux + lambda * (r - cos_aux))
-        phi2 = acos(cosphi_p)
-        deltad = sqrt(r2^2 + r1^2 + (z2-z1)^2 - 2 * r1 * r2 * cos(phi2 + phi1)) * wind.bh.R_g
-        d2 = (r2^2 + z2^2) * wind.bh.R_g^2
-        r1 = r2
-        z1 = z2
-        phi1 = phi2
-        tau += density * SIGMA_T * (1 + fm) * deltad 
     end
     # add last bit
     density = wind.grids.density[r_arg, z_arg]
     fm = wind.grids.fm[r_arg, z_arg]
-    #deltad = sqrt((r-r1)^2 + (z-z1)^2) * wind.bh.R_g
-    deltad = sqrt(r^2 + r1^2 + (z-z1)^2 - 2 * r1 * r * cos(phi1)) * wind.bh.R_g
-    d2 = (r^2 + z^2) * wind.bh.R_g^2
+    deltad = sqrt((r-r1)^2 + (z-z1)^2) * wind.bh.R_g
     tau += density * SIGMA_T * deltad * (1 + fm) 
-    return tau 
+    # normalize
+    delta = sqrt(r^2 + z^2 + r_d^2 - 2 * r * r_d * cos(phi_d))
+    tau = tau / sqrt((r-r_d)^2 + z^2) * delta
+    return tau
 end
 
 function tau_uv_disk_blob_old(wind::WindStruct, r_d, phi_d, r, z)
@@ -113,7 +116,6 @@ function integrate_notau_kernel(v, r_d, phi_d, r, z, wind)
     v[1] = (r - r_d * cos(phi_d)) * aux
     v[2] = aux
 end
-
 
 function integrate(r, z, wind::WindStruct; include_tau_uv=true)
     xmin = (wind.config["disk"]["inner_radius"], 0.)
