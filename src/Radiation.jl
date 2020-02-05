@@ -94,7 +94,14 @@ function compute_tau_x(r, z, wind::WindStruct)
     zp_arg = get_index(wind.grids.z_range, z2)
     lambda_r = 0.
     lambda_z = 0.
-    while ((rp_arg < r_arg) || (zp_arg < z_arg))
+    max_steps = abs(r_arg - 1) + abs(z_arg - 1) + 1
+    delta_d_total = 0.
+    counter = 1
+    #while ((rp_arg < r_arg) || (zp_arg < z_arg))
+    while(true)
+        if counter >= max_steps
+            break
+        end
         density = wind.grids.density[rp_arg, zp_arg]
         try
             r2_candidate = wind.grids.r_range[rp_arg + 1]
@@ -118,12 +125,14 @@ function compute_tau_x(r, z, wind::WindStruct)
             zp_arg += 1
             r2 = wind.grids.r_range[rp_arg]
             z2 = wind.grids.z_range[zp_arg]
+            counter += 1
         elseif lambda_r > lambda_z
             zp_arg += 1
             z2 = wind.grids.z_range[zp_arg]
             r2 = z2 / m
         end
         deltad = sqrt((r2-r1)^2 + (z2-z1)^2) * wind.bh.R_g
+        delta_d_total += deltad
         d2 = (r2^2 + z2^2) * wind.bh.R_g^2
         xi0 = wind.radiation.xray_luminosity / (density * d2)
         xi = xi0
@@ -135,11 +144,20 @@ function compute_tau_x(r, z, wind::WindStruct)
         r1 = r2
         z1 = z2
         tau += density * SIGMA_T * deltad * opacity_x(xi)
+        counter += 1
     end
     # add last bit
     density = wind.grids.density[r_arg, z_arg]
     deltad = sqrt((r-r1)^2 + (z-z1)^2) * wind.bh.R_g
+    delta_d_total += deltad
     d2 = (r^2 + z^2) * wind.bh.R_g^2
+    try
+        @assert delta_d_total ≈ sqrt(d2)
+    catch
+        println(delta_d_total)
+        println(sqrt(d2))
+        @assert delta_d_total ≈ sqrt(d2)
+    end
     xi0 = wind.radiation.xray_luminosity / (density * d2)
     xi = xi0
     for dummy in 1:2

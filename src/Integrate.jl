@@ -16,30 +16,54 @@ function tau_uv_disk_blob(wind::WindStruct, r_d, phi_d, r, z, return_list=false)
     deltad = 0.
     r1 = r_d
     z1 = 0.
+    z2 = 0.
+    r2 = r1
     tau = 0.
-    r_list = [r1]
-    z_list = [z1]
+    r_list = [convert(Float64,r1)]
+    z_list = [convert(Float64,z1)]
     step_r = convert(Int, sign(r - r_d))
-    println("$rp_arg $r_arg $zp_arg $z_arg")
-    while ((rp_arg != r_arg) && (zp_arg != z_arg))
+    lambda_r = 0.
+    lambda_z = 0.
+    r2_candidate = 0.
+    z2_candidate = 0.
+    line_length = abs(r_arg - rd_arg) + abs(z_arg - zp_arg)
+    delta_d_total = 0.
+    counter = 1
+    #while ((rp_arg != r_arg) || (zp_arg != z_arg))
+    #for kk in 1:line_length
+    while(true)
+        if counter >= line_length
+            break
+        end
+        r1 = r2
+        z1 = z2
+        #println("$rp_arg, $zp_arg")
         density = wind.grids.density[rp_arg, zp_arg]
         fm = wind.grids.fm[rp_arg, zp_arg]
         if rd_arg ==  r_arg
             zp_arg += 1
             z2 = wind.grids.z_range[zp_arg]
             deltad = (z2-z1) * wind.bh.R_g
+            delta_d_total += deltad
             z1 = z2
             tau += density * SIGMA_T * (1 + fm) * deltad
+            counter += 1
+            #println(deltad/wind.bh.R_g)
             push!(r_list, r1)
             push!(r_list, z1)
         else
-            r2_candidate = wind.grids.r_range[rp_arg + step_r]
-            z2_candidate = wind.grids.z_range[zp_arg + 1]
-            println(r2_candidate)
-            println(z2_candidate)
-            lambda_r = (r2_candidate - r1) / (r - r_d)
-            lambda_z = (z2_candidate - z1) / z
-            println("lambdar : $lambda_r lambda_z : $lambda_z")
+            try
+                r2_candidate = wind.grids.r_range[rp_arg + step_r]
+                lambda_r = (r2_candidate - r1) / (r - r_d)
+            catch
+                lambda_r = Inf32
+            end
+            try
+                z2_candidate = wind.grids.z_range[zp_arg + 1]
+                lambda_z = (z2_candidate - z1) / z
+            catch
+                lambda_z = Inf32
+            end
             if lambda_r < lambda_z
                 r2 = r2_candidate 
                 z2 = compute_zp(r2)
@@ -49,28 +73,43 @@ function tau_uv_disk_blob(wind::WindStruct, r_d, phi_d, r, z, return_list=false)
                 z2 = z2_candidate 
                 rp_arg += step_r
                 zp_arg += 1
+                counter += 1
             elseif lambda_r > lambda_z
                 z2 = z2_candidate 
                 r2 = compute_rp(z2)
                 zp_arg += 1
             end
+            counter +=1
             deltad = sqrt((r2-r1)^2 + (z2-z1)^2) * wind.bh.R_g
-            r1 = r2
-            z1 = z2
+            delta_d_total += deltad
+            #println(delta_d_total/wind.bh.R_g)
+            #println(sqrt((r2-r_d)^2 + z2^2))
+            #println("$r1, $z1")
+            #println("===")
             push!(r_list, r1)
             push!(z_list, z1)
-            tau += density * SIGMA_T * (1 + fm) * deltad 
+            tau += density * SIGMA_T * (1. + fm) * deltad 
         end
     end
     # add last bit
     density = wind.grids.density[r_arg, z_arg]
     fm = wind.grids.fm[r_arg, z_arg]
-    deltad = sqrt((r-r1)^2 + (z-z1)^2) * wind.bh.R_g
+    deltad = sqrt((r-r2)^2 + (z-z2)^2) * wind.bh.R_g
+    delta_d_total += deltad
     tau += density * SIGMA_T * deltad * (1 + fm) 
     # normalize
     push!(r_list, r)
     push!(z_list, z)
     delta = sqrt(r^2 + z^2 + r_d^2 - 2 * r * r_d * cos(phi_d))
+    asd = sqrt((r-r_d)^2 + z^2)
+    try
+        asd = sqrt((r-r_d)^2 + z^2)
+        @assert isapprox(delta_d_total, asd * wind.bh.R_g,  atol=0, rtol=1e-1)
+    catch
+        println("distances do not match!")
+        println(delta_d_total)
+        println(asd * wind.bh.R_g)
+    end
     tau = tau / sqrt((r-r_d)^2 + z^2) * delta
     if return_list
         return tau, r_list, z_list

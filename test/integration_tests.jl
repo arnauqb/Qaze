@@ -1,12 +1,13 @@
 @testset "Tau UV disk blob" begin
-    r_range = range(1, stop=1000, length=20)
-    z_range = range(1e-4, stop=1000, length=20)
-    r_d_range = range(6, stop=1000, length=20)
-    phi_d_range = range(0, stop=pi, length=20)
+    r_range = range(1., stop=1000., length=20)
+    z_range = range(1e-4, stop=1000., length=20)
+    r_d_range = range(6., stop=1000., length=20)
+    phi_d_range = range(0., stop=pi, length=20)
     for r in r_range
         for z in z_range
             for r_d in r_d_range
                 for phi in phi_d_range
+                    #println("$r_d, $phi, $r, $z")
                     delta = sqrt(r^2 + z^2 + r_d^2 - 2 * r * r_d * cos(phi))
                     tau = delta * SIGMA_T * wind.config["wind"]["n_shielding"] * wind.bh.R_g
                     @test tau_uv_disk_blob(wind, r_d, phi, r, z) ≈ tau atol=0 rtol=1e-2
