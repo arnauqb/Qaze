@@ -41,8 +41,8 @@ end
 end
 
 @testset "Force radiation" begin
-    @test force_radiation(100., 50., 0., wind, include_tau_uv=false) ≈ [5e-6, 4.2e-6] atol = 0 rtol = 0.1
-    @test force_radiation(5., 10., 0., wind, include_tau_uv=false) ≈ [-7e-6, 6e-5] atol = 0 rtol = 0.1
-    @test force_radiation(1000., 0.1, 0., wind, include_tau_uv=false) ≈ [1.9e-11, 9e-11] atol = 0 rtol = 0.2
+    @test force_radiation(100., 50., 0., wind, include_tau_uv=false) .≈ [5e-6, 4.2e-6] atol = 0 rtol = 0.1
+    @test force_radiation(5., 10., 0., wind, include_tau_uv=false) .≈ [-7e-6, 6e-5] atol = 0 rtol = 0.1
+    @test force_radiation(1000., 0.1, 0., wind, include_tau_uv=false) .≈ [1.9e-11, 9e-11] atol = 0 rtol = 0.2
 end
 
