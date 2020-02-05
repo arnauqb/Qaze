@@ -1,5 +1,5 @@
 export thermal_velocity, eddington_luminosity, initialize_uv_fraction, nt_rel_factors, opacity_x, compute_tau_x, ionization_parameter,
-       compute_tau_eff, force_multiplier, force_radiation, compute_tau_x_l33t
+       compute_tau_eff, force_multiplier, force_radiation
 
 function thermal_velocity(T, mu = 1.)
     v = sqrt(K_B * T / (mu * M_P)) / C
@@ -92,12 +92,23 @@ function compute_tau_x(r, z, wind::WindStruct)
     tau = sqrt(r2^2 + z2^2) * wind.bh.R_g * SIGMA_T * wind.config["wind"]["n_shielding"]
     rp_arg = 1
     zp_arg = get_index(wind.grids.z_range, z2)
-    while ((rp_arg < r_arg) && (zp_arg < z_arg))
+    lambda_r = 0.
+    lambda_z = 0.
+    while ((rp_arg < r_arg) || (zp_arg < z_arg))
         density = wind.grids.density[rp_arg, zp_arg]
-        r2_candidate = wind.grids.r_range[rp_arg + 1]
-        z2_candidate = wind.grids.z_range[zp_arg + 1]
-        lambda_r = (r2_candidate - r1) / r
-        lambda_z = (z2_candidate - z1) / z
+        try
+            r2_candidate = wind.grids.r_range[rp_arg + 1]
+            lambda_r = (r2_candidate - r1) / r
+        catch
+            lambda_r = Inf32
+            nothing
+        end
+        try
+            z2_candidate = wind.grids.z_range[zp_arg + 1]
+            lambda_z = (z2_candidate - z1) / z
+        catch
+            lambda_z = Inf32
+        end
         if lambda_r < lambda_z
             rp_arg += 1
             r2 = wind.grids.r_range[rp_arg]

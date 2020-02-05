@@ -12,9 +12,10 @@ function tau_uv_disk_blob(wind::WindStruct, r_d, phi_d, r, z)
     deltad = 0.
     r1 = r_d
     z1 = 0.
+    phi1 = phi_d
     tau = 0.
-    #r_list = [r1]
-    #z_list = [z1]
+    cos_aux = r_d * cos(phi_d)
+    lambda = 0.
     step_r = convert(Int, sign(r - r_d))
     while ((rp_arg != r_arg) && (zp_arg != z_arg))
         density = wind.grids.density[rp_arg, zp_arg]
@@ -24,34 +25,37 @@ function tau_uv_disk_blob(wind::WindStruct, r_d, phi_d, r, z)
         lambda_r = (r2_candidate - r1) / r
         lambda_z = (z2_candidate - z1) / z
         if lambda_r < lambda_z
+            lambda = lambda_r
             rp_arg += step_r
             r2 = wind.grids.r_range[rp_arg]
             z2 = compute_zp(r2) 
         elseif lambda_r == lambda_z
+            lambda = lambda_r
             rp_arg += step_r
             zp_arg += 1
             r2 = wind.grids.r_range[rp_arg]
             z2 = wind.grids.z_range[zp_arg]
         elseif lambda_r > lambda_z
+            lambda = lambda_z
             zp_arg += 1
             z2 = wind.grids.z_range[zp_arg]
             r2 = compute_rp(z2)
         end
-        deltad = sqrt((r2-r1)^2 + (z2-z1)^2) * wind.bh.R_g
+        cosphi_p = 1 / r2 * (cos_aux + lambda * (r - cos_aux))
+        phi2 = acos(cosphi_p)
+        deltad = sqrt(r2^2 + r1^2 + (z2-z1)^2 - 2 * r1 * r2 * cos(phi2 + phi1)) * wind.bh.R_g
         d2 = (r2^2 + z2^2) * wind.bh.R_g^2
         r1 = r2
         z1 = z2
-        #push!(r_list, r1)
-        #push!(z_list, z1)
+        phi1 = phi2
         tau += density * SIGMA_T * (1 + fm) * deltad 
     end
     # add last bit
     density = wind.grids.density[r_arg, z_arg]
     fm = wind.grids.fm[r_arg, z_arg]
-    deltad = sqrt((r-r1)^2 + (z-z1)^2) * wind.bh.R_g
+    #deltad = sqrt((r-r1)^2 + (z-z1)^2) * wind.bh.R_g
+    deltad = sqrt(r^2 + r1^2 + (z-z1)^2 - 2 * r1 * r * cos(phi1)) * wind.bh.R_g
     d2 = (r^2 + z^2) * wind.bh.R_g^2
-    #push!(r_list, r)
-    #push!(z_list, z)
     tau += density * SIGMA_T * deltad * (1 + fm) 
     return tau 
 end

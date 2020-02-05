@@ -1,6 +1,7 @@
 export compute_density, initialize_line, compute_initial_acceleration, residual!, condition, affect, save, solve_line!
 using DifferentialEquations
 using Sundials
+using Statistics
 
 function compute_density(r, z, v_T, line::StreamlineStruct)
     d = sqrt(r^2 + z^2)
@@ -95,10 +96,9 @@ function condition(u, t, integrator)
             crossing_condition = true
         end
     end
-    
-    escaped_condition = d > integrator.p.wind.grids.d_max
+    escaped_condition = (r > integrator.p.wind.grids.r_range[end]) || (z > integrator.p.wind.grids.z_range[end])
     failed_condtion = z < integrator.p.z_0 
-    cond = escaped_condition | failed_condtion | crossing_condition
+    cond = escaped_condition | failed_condtion | crossing_condition 
     return cond
 end
 
