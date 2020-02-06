@@ -16,21 +16,21 @@ outer_radius = 1600.0
 mu = 1.0
 
 [grids]
-r_min = 0.0
-z_min = 0.0
-r_max = 1000.0
-z_max = 1000.0
-n_r = 1000
-n_z = 1001
+r_min = 0.001
+z_min = 0.001
+r_max = 4000.0
+z_max = 4000.0
+n_r = 2500
+n_z = 2501
 n_r_disk = 501 
 n_phi_disk = 251
-log_spaced = false
+log_spaced = true
 
 [radiation]
 f_uv = "auto" 
 f_x = "auto"
 non_adaptive_integral = false
-integral_rtol = 1e-2
+integral_rtol = 1e-3
 analytical_fm = true
 tau_uv_geometry = "disk"
 disk_uv_fraction = true 
