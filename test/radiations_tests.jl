@@ -18,9 +18,13 @@ end
     #z_range = [5, 5, 20, 800, 5]
     r_range = range(1, stop=1000, length=50)
     z_range = range(1e-4, stop=1000, length=50)
-    tau_truth = wind.config["wind"]["n_shielding"] * sqrt.(r_range .^2 + z_range .^2) * SIGMA_T * wind.bh.R_g
-    f(r,z) = compute_tau_x(r, z, wind)
-    @test f.(r_range, z_range) ≈ tau_truth rtol=1e-4 atol=0
+    for r in r_range
+        for z in z_range
+            tau_truth = wind.config["wind"]["n_shielding"] * sqrt.(r^2 + z^2) * SIGMA_T * wind.bh.R_g
+            tauuv = compute_tau_x(r, z, wind)
+            @test tauuv ≈ tau_truth rtol=1e-4 atol=0
+        end
+    end
 end
 
 @testset "Ionization Parameter" begin

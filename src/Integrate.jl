@@ -3,7 +3,7 @@ using Cubature
 #using HCubature
 
 function tau_uv_disk_blob(wind::WindStruct, r_d, phi_d, r, z, return_list=false)
-    if (z==0.)
+    if (z<=0. || r < 0)
         return 0
     end
     rp_arg = get_index(wind.grids.r_range, r_d)
@@ -19,8 +19,8 @@ function tau_uv_disk_blob(wind::WindStruct, r_d, phi_d, r, z, return_list=false)
     z2 = 0.
     r2 = r1
     tau = 0.
-    r_list = [convert(Float64,r1)]
-    z_list = [convert(Float64,z1)]
+    #r_list = [convert(Float64,r1)]
+    #z_list = [convert(Float64,z1)]
     step_r = convert(Int, sign(r - r_d))
     lambda_r = 0.
     lambda_z = 0.
@@ -29,28 +29,28 @@ function tau_uv_disk_blob(wind::WindStruct, r_d, phi_d, r, z, return_list=false)
     line_length = abs(r_arg - rd_arg) + abs(z_arg - zp_arg)
     delta_d_total = 0.
     counter = 1
-    #while ((rp_arg != r_arg) || (zp_arg != z_arg))
-    #for kk in 1:line_length
+    if rd_arg == r_arg
+        vertical = true
+    else
+        vertical = false
+    end
     while(true)
         if counter >= line_length
             break
         end
         r1 = r2
         z1 = z2
-        #println("$rp_arg, $zp_arg")
         density = wind.grids.density[rp_arg, zp_arg]
         fm = wind.grids.fm[rp_arg, zp_arg]
-        if rd_arg ==  r_arg
+        if vertical
             zp_arg += 1
             z2 = wind.grids.z_range[zp_arg]
             deltad = (z2-z1) * wind.bh.R_g
             delta_d_total += deltad
-            z1 = z2
             tau += density * SIGMA_T * (1 + fm) * deltad
             counter += 1
-            #println(deltad/wind.bh.R_g)
-            push!(r_list, r1)
-            push!(r_list, z1)
+            #push!(r_list, r1)
+            #push!(r_list, z1)
         else
             try
                 r2_candidate = wind.grids.r_range[rp_arg + step_r]
@@ -82,40 +82,47 @@ function tau_uv_disk_blob(wind::WindStruct, r_d, phi_d, r, z, return_list=false)
             counter +=1
             deltad = sqrt((r2-r1)^2 + (z2-z1)^2) * wind.bh.R_g
             delta_d_total += deltad
-            #println(delta_d_total/wind.bh.R_g)
-            #println(sqrt((r2-r_d)^2 + z2^2))
-            #println("$r1, $z1")
-            #println("===")
-            push!(r_list, r1)
-            push!(z_list, z1)
+            #push!(r_list, r1)
+            #push!(z_list, z1)
             tau += density * SIGMA_T * (1. + fm) * deltad 
         end
     end
     # add last bit
     density = wind.grids.density[r_arg, z_arg]
     fm = wind.grids.fm[r_arg, z_arg]
-    deltad = sqrt((r-r2)^2 + (z-z2)^2) * wind.bh.R_g
-    delta_d_total += deltad
+    if !vertical
+        deltad = sqrt((r-r2)^2 + (z-z2)^2) * wind.bh.R_g
+        delta_d_total += deltad
+    else
+        delta_d_total += (z-z2) * wind.bh.R_g
+    end
     tau += density * SIGMA_T * deltad * (1 + fm) 
     # normalize
-    push!(r_list, r)
-    push!(z_list, z)
+    #push!(r_list, r)
+    #push!(z_list, z)
     delta = sqrt(r^2 + z^2 + r_d^2 - 2 * r * r_d * cos(phi_d))
-    asd = sqrt((r-r_d)^2 + z^2)
     try
-        asd = sqrt((r-r_d)^2 + z^2)
-        @assert isapprox(delta_d_total, asd * wind.bh.R_g,  atol=0, rtol=1e-1)
+        if vertical 
+            @assert isapprox(delta_d_total, z * wind.bh.R_g,  atol=0, rtol=1e-1)
+        else
+            asd = sqrt((r-r_d)^2 + z^2)
+            @assert isapprox(delta_d_total, asd * wind.bh.R_g,  atol=0, rtol=1e-1)
+        end
     catch
         println("distances do not match!")
-        println(delta_d_total)
-        println(asd * wind.bh.R_g)
+        println("r_d: $r_d, phi_d: $phi_d r:$r, z:$z")
+        asd = sqrt((r-r_d)^2 + z^2)
+        println("z : $z")
+        println(delta_d_total / wind.bh.R_g)
+        println(asd)
     end
     tau = tau / sqrt((r-r_d)^2 + z^2) * delta
-    if return_list
-        return tau, r_list, z_list
-    else
-        return tau
-    end
+    return tau
+    #if return_list
+    #    return tau, r_list, z_list
+    #else
+    #    return tau
+    #end
 end
 
 function tau_uv_disk_blob_old(wind::WindStruct, r_d, phi_d, r, z)

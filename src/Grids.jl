@@ -277,8 +277,9 @@ function update_mdot_grid(wind::WindStruct)
         mdot = wind.bh.mdot - accumulated_wind
         wind.grids.mdot[rmin_arg:rmax_arg] .= max(mdot , 0.)
     end
-    rmin = wind.config["wind"]["initial_radius"]
+    rmin = wind.lines_initial_radius 
     rmin_arg = get_index(wind.grids.disk_range, rmin )
+    println(rmin_arg)
     wind.grids.mdot[1:rmin_arg] .= max(wind.bh.mdot - accumulated_wind, 0.)
     return wind.grids.mdot
 end

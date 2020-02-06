@@ -49,7 +49,7 @@ function initialize(config::Dict)
     force_constant = 3 / (8 * pi * bh.eta)
     rad = RadiationStruct(bol_lumin, edd_lumin, f_uv, f_x, xray_lumin, force_constant)
     lines = Array{Any,1}(undef, config["wind"]["number_streamlines"])
-    wind = WindStruct(config, bh, sed, grids, rad, lines, lines_range, lines_widths)
+    wind = WindStruct(config, bh, sed, grids, rad, lines, lines_initial_radius, lines_range, lines_widths)
     initialize_uv_fraction(wind)
     initialize_json(config["general"]["save_path"], wind)
     return wind
