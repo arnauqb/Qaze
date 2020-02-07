@@ -12,5 +12,6 @@ include("Utils.jl")
 include("Config.jl")
 include("InitialConditions.jl")
 include("Wind.jl")
+include("Plotting.jl")
 
 end #module

@@ -1,2 +1,4 @@
 *.json
 Manifest.toml
+*.png
+*.gif

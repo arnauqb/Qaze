@@ -81,7 +81,7 @@ function compute_tau_x_old(r, z, wind::WindStruct)
 end
 
 function compute_tau_x(r, z, wind::WindStruct)
-    if r < 0 || z < 0
+    if r <= wind.grids.r_range[1] || z < 0
         return 0.
     end
     r1 = 0.
@@ -97,8 +97,8 @@ function compute_tau_x(r, z, wind::WindStruct)
     zp_arg = get_index(wind.grids.z_range, z2)
     lambda_r = 0.
     lambda_z = 0.
-    max_steps = abs(r_arg - 1) + abs(z_arg - 1) 
-    delta_d_total = 0.
+    max_steps = max(abs(r_arg - 1), abs(z_arg - 1))
+    delta_d_total = sqrt(r2^2 + z2^2) * wind.bh.R_g
     counter = 1
     #while ((rp_arg < r_arg) || (zp_arg < z_arg))
     while(true)
@@ -155,10 +155,12 @@ function compute_tau_x(r, z, wind::WindStruct)
     delta_d_total += deltad
     d2 = (r^2 + z^2) * wind.bh.R_g^2
     try
-        @assert delta_d_total ≈ sqrt(d2)
+        @assert isapprox(delta_d_total, sqrt(d2), atol=0, rtol=5e-1)
     catch
+        println("distances do not match!")
         println("r : $r z : $z")
-        @assert delta_d_total ≈ sqrt(d2)
+        println("deltad_total: $(delta_d_total/wind.bh.R_g) d2 : $(sqrt(d2)/wind.bh.R_g)")
+        @assert isapprox(delta_d_total, sqrt(d2), atol=0, rtol=1e-2)
     end
     xi0 = wind.radiation.xray_luminosity / (density * d2)
     xi = xi0
@@ -218,7 +220,7 @@ function force_multiplier(t, xi)
 end
 
 function force_radiation(r, z, fm, wind::WindStruct ; include_tau_uv = false)
-    if (z < 1e-3 || wind.config["wind"]["gravity_only"])
+    if (z <= 1e-3 || wind.config["wind"]["gravity_only"])
         return [0.,0.]
     end
     int_values = integrate(r, z, wind, include_tau_uv=include_tau_uv)

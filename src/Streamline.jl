@@ -11,16 +11,16 @@ function compute_density(r, z, v_T, line::StreamlineStruct)
     return n
 end
 
-function initialize_line(line_id, r_0, z_0, v_0, n_0, v_th, wind::WindStruct, is_first_iter)
+function initialize_line(line_id, r_0, z_0, v_0, n_0, v_th, wind::WindStruct)
     v_phi_0 = sqrt(1. / r_0)
     l = v_phi_0 * r_0
-    a_r_0, a_z_0, fm, xi, dv_dr, tau_x = compute_initial_acceleration(r_0, z_0, v_0, n_0, v_th, l, wind, is_first_iter)
+    a_r_0, a_z_0, fm, xi, dv_dr, tau_x = compute_initial_acceleration(r_0, z_0, v_0, n_0, v_th, l, wind)
     u0 = [r_0, z_0, 0., v_0]
     du0 = [0., v_0, a_r_0, a_z_0]
     lw0 = wind.lines_widths[line_id]
     u_hist = reshape(u0, (1,4))
     line = StreamlineStruct(wind, line_id, r_0, z_0, v_0, v_phi_0, n_0,
-                            v_th, l, lw0, false, 0, is_first_iter, u_hist,
+                            v_th, l, lw0, false, 0, u_hist,
                             [n_0], [tau_x], [fm], [xi], [dv_dr], [a_r_0], [a_z_0])
     tspan = (0., 1e8)
     termination_cb = DiscreteCallback(condition, affect, save_positions=(false, false))
@@ -38,12 +38,12 @@ function solve_line!(line)
     solve!(line)
 end
 
-function compute_initial_acceleration(r_0, z_0, v_0, n_0, v_th, l, wind::WindStruct, is_first_iter)
+function compute_initial_acceleration(r_0, z_0, v_0, n_0, v_th, l, wind::WindStruct)
     fg = gravity(r_0, z_0, wind.bh)
     tau_x = compute_tau_x(r_0, z_0, wind)
     xi = ionization_parameter(r_0, z_0, n_0, tau_x, wind)
     fm = force_multiplier(1, xi)
-    fr = force_radiation(r_0, z_0, fm, wind, include_tau_uv=!is_first_iter)
+    fr = force_radiation(r_0, z_0, fm, wind, include_tau_uv=wind.radiation.taufm)
     centrifugal_term = l^2 / r_0^3
     a_r = fg[1] + fr[1] + centrifugal_term
     a_z = fg[2] + fr[2] 
@@ -52,7 +52,7 @@ function compute_initial_acceleration(r_0, z_0, v_0, n_0, v_th, l, wind::WindStr
     dv_dr = a_T / v_0
     tau_eff = compute_tau_eff(n_0, dv_dr, v_th)
     fm = force_multiplier(tau_eff, xi)
-    fr = force_radiation(r_0, z_0, fm, wind, include_tau_uv=!is_first_iter)
+    fr = force_radiation(r_0, z_0, fm, wind, include_tau_uv=wind.radiation.taufm)
     a_r = fg[1] + fr[1] + centrifugal_term
     a_z = fg[2] + fr[2] 
     return [a_r, a_z, fm, xi, dv_dr, tau_x]
@@ -70,7 +70,7 @@ function residual!(resid, du, u, line, t)
     xi = ionization_parameter(r, z, n, tau_x, line.wind)
     tau_eff = compute_tau_eff(n, dv_dr, line.v_th)
     fm = force_multiplier(tau_eff, xi)
-    fr = force_radiation(r, z, fm, line.wind, include_tau_uv=!line.is_first_iter)
+    fr = force_radiation(r, z, fm, line.wind, include_tau_uv=line.wind.radiation.taufm)
     centrifugal_term = line.l^2 / r^3
     a_r = fg[1] + fr[1] + centrifugal_term
     a_z = fg[2] + fr[2] 
@@ -92,7 +92,7 @@ function condition(u, t, integrator)
     crossing_condition = false
     if r < integrator.p.r_0
         integrator.p.crossing_counter += 1
-        if integrator.p.crossing_counter > 4
+        if integrator.p.crossing_counter >= 4
             crossing_condition = true
         end
     end

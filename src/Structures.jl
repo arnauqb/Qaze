@@ -31,13 +31,14 @@ struct BlackHoleStruct
     disk_r_max::Float64
 end
 
-struct RadiationStruct
+mutable struct RadiationStruct
     bol_luminosity::Float64
     eddington_luminosity::Float64
     f_uv::Float64
     f_x::Float64
     xray_luminosity::Float64
     force_constant::Float64
+    taufm::Bool
 end
 
 mutable struct WindStruct
@@ -65,7 +66,6 @@ mutable struct StreamlineStruct
     line_width::Float64
     escaped::Bool
     crossing_counter::Int64
-    is_first_iter::Bool
     u_hist::Array{Float64,2}
     n_hist::Array{Float64,1}
     tau_x_hist::Array{Float64,1}

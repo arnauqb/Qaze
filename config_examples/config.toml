@@ -1,7 +1,7 @@
 title = "Qwind config file"
 
 [general]
-save_path = "full.json"
+save_path = "refin.json"
 verbosity = 0
 
 [bh]
@@ -16,15 +16,15 @@ outer_radius = 1600.0
 mu = 1.0
 
 [grids]
-r_min = 0.001
-z_min = 0.001
-r_max = 4000.0
-z_max = 4000.0
-n_r = 2500
-n_z = 2501
+r_min = 0.0
+z_min = 0.0
+r_max = 1000.0
+z_max = 500.0
+n_r = 50
+n_z = 51
 n_r_disk = 501 
 n_phi_disk = 251
-log_spaced = true
+log_spaced = false 
 
 [radiation]
 f_uv = "auto" 
@@ -41,7 +41,7 @@ tau_uv_ignore_grid = false
 tau_x_ignore_grid = false 
 
 [wind]
-initial_radius =  "warm_radius"
+initial_radius = "warm_radius" 
 final_radius = 1000.0
 number_streamlines = 50
 iterations = 1
@@ -51,7 +51,7 @@ wind_temperature = "disk"
 initial_conditions = "manual"
 n_0 = "cak"
 v_0 = "thermal"
-z_0 = 0.1
+z_0 = 1.0
 solver_rtol = 1e-2
 gravity_only = false 
 nofm = false

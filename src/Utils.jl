@@ -144,4 +144,3 @@ function write_properties_and_grids(json_file, wind::WindStruct, it_num)
         JSON.print(f,data)
     end
 end
-
