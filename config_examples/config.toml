@@ -43,7 +43,7 @@ tau_x_ignore_grid = false
 [wind]
 initial_radius = "warm_radius" 
 final_radius = 1000.0
-number_streamlines = 50
+number_streamlines = 20
 iterations = 1
 log_spaced = false
 n_shielding = 1e2

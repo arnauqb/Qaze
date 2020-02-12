@@ -1,5 +1,6 @@
 using PyCall
-export GridsStruct, BlackHoleStruct, RadiationStruct, StreamlineStruct, WindStruct
+using RegionTrees: AbstractRefinery, Cell
+export GridsStruct, BlackHoleStruct, RadiationStruct, StreamlineStruct, WindStruct, GridRefinery
 
 struct GridsStruct
     n_r::Int64
@@ -46,6 +47,7 @@ mutable struct WindStruct
     bh::BlackHoleStruct
     sed::PyObject
     grids::GridsStruct
+    quadtree::Cell
     radiation::RadiationStruct
     lines::Array{Any,1}
     lines_initial_radius::Float64
@@ -74,4 +76,9 @@ mutable struct StreamlineStruct
     dv_dr_hist::Array{Float64,1}
     a_r_hist::Array{Float64,1}
     a_z_hist::Array{Float64,1}
+end
+
+struct GridRefinery <: AbstractRefinery
+    tau_tolerance::Float64
+    wind::WindStruct
 end

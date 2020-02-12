@@ -1,6 +1,7 @@
 export initialize
 #ENV["PYCALL_JL_RUNTIME_PYTHON"]="/home/arnau/Documents/qwind/env/bin/python"
 using PyCall
+using RegionTrees: Cell
 
 
 function initialize(config::String)
@@ -49,7 +50,12 @@ function initialize(config::Dict)
     force_constant = 3 / (8 * pi * bh.eta)
     rad = RadiationStruct(bol_lumin, edd_lumin, f_uv, f_x, xray_lumin, force_constant, false)
     lines = Array{Any,1}(undef, config["wind"]["number_streamlines"])
-    wind = WindStruct(config, bh, sed, grids, rad, lines, lines_initial_radius, lines_range, lines_widths)
+    quadtree_max_radius = config["grids"]["r_max"]
+    quadtree_max_height = config["grids"]["z_max"]
+    n_shielding = config["wind"]["n_shielding"]
+    delta_tau_0 = n_shielding * sqrt(quadtree_max_height^2 + quadtree_max_radius^2) * R_g * SIGMA_T
+    quadtree = Cell(SVector(0., 0.), SVector(quadtree_max_radius, quadtree_max_height), [n_shielding, 0., delta_tau_0])
+    wind = WindStruct(config, bh, sed, grids, quadtree, rad, lines, lines_initial_radius, lines_range, lines_widths)
     initialize_uv_fraction(wind)
     initialize_json(config["general"]["save_path"], wind)
     return wind

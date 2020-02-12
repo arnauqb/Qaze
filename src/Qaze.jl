@@ -13,5 +13,6 @@ include("Config.jl")
 include("InitialConditions.jl")
 include("Wind.jl")
 include("Plotting.jl")
+include("QuadTree.jl")
 
 end #module
