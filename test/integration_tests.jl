@@ -7,10 +7,11 @@
         for z in z_range
             for r_d in r_d_range
                 for phi in phi_d_range
-                    #println("$r_d, $phi, $r, $z")
+                   # println("$r_d, $phi, $r, $z")
                     delta = sqrt(r^2 + z^2 + r_d^2 - 2 * r * r_d * cos(phi))
                     tau = delta * SIGMA_T * wind.config["wind"]["n_shielding"] * wind.bh.R_g
-                    @test tau_uv_disk_blob(wind, r_d, phi, r, z) ≈ tau atol=0 rtol=1e-2
+                    #@test tau_uv_disk_blob(wind, r_d, phi, r, z) ≈ tau atol=0 rtol=1e-2
+                    @test tau_uv_disk_blob(r_d, phi, r, z, wind) ≈ tau atol=0 rtol=1e-2
                 end
             end
         end
@@ -55,10 +56,10 @@ end
     wind.grids.uv_fractions ./= 2
     wind.grids.density .= 1e20
     integrate_kernel(v, 100, 1, 200, 50, wind) 
-    @test all(isapprox.(v, [0.,0.], atol=0, rtol=1e-4))
+    @test all(v .< [1e-11,1e-11])
     wind.grids.density .= wind.config["wind"]["n_shielding"]
     wind.grids.density .= 1e10
     integrate_kernel(v, 100, 1, 200, 50, wind) 
-    @test all(v .< [1e-15,1e-15])
+    @test all(v .< [1e-11,1e-11])
     wind.grids.density .= wind.config["wind"]["n_shielding"]
 end

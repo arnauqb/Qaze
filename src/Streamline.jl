@@ -2,6 +2,7 @@ export compute_density, initialize_line, compute_initial_acceleration, residual!
 using DifferentialEquations
 using Sundials
 using Statistics
+using RegionTrees
 
 function compute_density(r, z, v_T, line::StreamlineStruct)
     d = sqrt(r^2 + z^2)
@@ -20,7 +21,7 @@ function initialize_line(line_id, r_0, z_0, v_0, n_0, v_th, wind::WindStruct)
     lw0 = wind.lines_widths[line_id]
     u_hist = reshape(u0, (1,4))
     line = StreamlineStruct(wind, line_id, r_0, z_0, v_0, v_phi_0, n_0,
-                            v_th, l, lw0, false, 0, u_hist,
+                            v_th, l, lw0, false, false, 0, u_hist,
                             [n_0], [tau_x], [fm], [xi], [dv_dr], [a_r_0], [a_z_0])
     tspan = (0., 1e8)
     termination_cb = DiscreteCallback(condition, affect, save_positions=(false, false))
@@ -28,7 +29,7 @@ function initialize_line(line_id, r_0, z_0, v_0, n_0, v_th, wind::WindStruct)
     saving_cb = SavingCallback(save, saved_values_type)
     cb = CallbackSet(termination_cb, saving_cb)
     problem = DAEProblem(residual!, du0, u0, tspan, p=line, differential_vars=[true, true, true, true])
-    integrator = init(problem, IDA(), callback=cb)
+    integrator = init(problem, IDA(), callback=cb, dtmax=5e-2 * wind.bh.R_g / C)
     integrator.opts.abstol = 0.
     integrator.opts.reltol = wind.config["wind"]["solver_rtol"]
     return integrator
@@ -61,6 +62,16 @@ end
 function residual!(resid, du, u, line, t)
     r, z, v_r, v_z = u
     r_dot, z_dot, v_r_dot, v_z_dot = du
+    if r < 0 || z < 0
+        println("warning, out of domain")
+        a_r = 0.
+        a_z = 0.
+        resid[1] = r_dot - v_r
+        resid[2] = z_dot - v_z
+        resid[3] = v_r_dot - a_r
+        resid[4] = v_z_dot - a_z
+        return nothing
+    end
     fg = gravity(r, z, line.wind.bh)
     v_T = sqrt(r_dot^2 + z_dot^2)
     a_T = sqrt(v_r_dot^2 + v_z_dot^2)
@@ -98,7 +109,7 @@ function condition(u, t, integrator)
     end
     escaped_condition = (r > integrator.p.wind.grids.r_range[end]) || (z > integrator.p.wind.grids.z_range[end])
     failed_condtion = z < integrator.p.z_0 
-    cond = escaped_condition | failed_condtion | crossing_condition 
+    cond = escaped_condition | failed_condtion | crossing_condition
     return cond
 end
 
@@ -124,12 +135,19 @@ function save(u, t, integrator)
     tau_eff = compute_tau_eff(n, dv_dr, integrator.p.v_th)
     fm = force_multiplier(tau_eff, xi)
     r_0, z_0, v_r_0, v_z_0 = integrator.p.u_hist[end,:]
-    lw = integrator.p.line_width / integrator.p.r_0 * r
-    if integrator.p.wind.config["radiation"]["tau_uv_include_fm"]
-        update_density_and_fm_lines(r_0, r, z_0, z, lw, n, fm, integrator.p.line_id, integrator.p.wind)
-    else
-        update_density_and_fm_lines(r_0, r, z_0, z, lw, n, 0., integrator.p.line_id, integrator.p.wind)
-    end
+    #lw = integrator.p.line_width / integrator.p.r_0 * r
+    linewidth_normalized = integrator.p.line_width / integrator.p.r_0 
+    #if integrator.p.wind.config["radiation"]["tau_uv_include_fm"]
+    #    update_density_and_fm_lines(r_0, r, z_0, z, lw, n, fm, integrator.p.line_id, integrator.p.wind)
+    #else
+    #    update_density_and_fm_lines(r_0, r, z_0, z, lw, n, 0., integrator.p.line_id, integrator.p.wind)
+    #end
+    currentpoint = [r, z]
+    previouspoint = [r_0, z_0]
+    #fill_point(currentpoint, previouspoint, linewidth_normalized, n, fm, integrator.p.wind)
+    #currentleaf = findleaf(integrator.p.wind.quadtree, [r,z])
+    #refine_line([r,z], currentleaf, integrator, integrator.p.wind)
+    fill_and_refine(currentpoint, previouspoint, linewidth_normalized, n, fm, integrator.p.wind)
     integrator.p.u_hist = [integrator.p.u_hist ; transpose(u)]
     push!(integrator.p.fm_hist, fm)
     push!(integrator.p.n_hist, n)

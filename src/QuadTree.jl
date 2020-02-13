@@ -1,9 +1,12 @@
 using RegionTrees: vertices, Cell, findleaf, children, split!
 import Base: copy
 using StaticArrays: SVector
-import RegionTrees: needs_refinement, refine_data, AbstractRefinery, allleaves
-export compute_cell_intersection, compute_cell_size, fill_linewidth, fill_point, fill_all_points, copy, needs_refinement, refine_data, refine, refine_mine
-
+using RegionTrees
+export compute_cell_intersection, compute_cell_size, fill_linewidth, fill_point, 
+fill_all_lines, copy, refine_all, refine_leaf, compute_density_grid, 
+plot_density_grid_tree, plot_tricontour, plot_taux_grid_tree, fill_line, refine_line, fill_and_refine
+using PyPlot
+LogNorm = matplotlib.colors.LogNorm
 
 function compute_cell_size(cell::Cell)
     r1, z1 = vertices(cell.boundary)[1,1]
@@ -45,7 +48,15 @@ function compute_cell_intersection(current_point, cell::Cell, initial_point, fin
         lambda_z = (cell_z_boundary - z) / (z_f - z_i)
     end
     lambda = min(lambda_r, lambda_z)
-    @assert lambda >= 0.0
+    try
+        @assert lambda >= 0.0
+    catch
+        println("current point : $current_point")
+        println("cell: $cell")
+        println("initial point: $initial_point")
+        println("final point: $final_point")
+        @assert lambda >= 0.0
+    end
     intersection = [r, z] + lambda .* [r_f - r_i, z_f - z_i]
     return intersection
 end
@@ -113,7 +124,21 @@ function fill_point(point1, point2, linewidth_normalized, density, fm, wind::Win
     end
 end
 
-function fill_all_points(wind::WindStruct)
+function fill_line(line, wind::WindStruct)
+    if length(line.p.n_hist) < 3
+        return nothing
+    end
+    linewidth_normalized = line.p.line_width / line.p.r_0 
+    for i in 2:(length(line.p.n_hist) - 1)
+        point1 = line.p.u_hist[i, 1:2]
+        point2 = line.p.u_hist[i+1, 1:2]
+        rho = line.p.n_hist[i]
+        fm = line.p.fm_hist[i]
+        fill_point(point1, point2, linewidth_normalized, rho, fm, wind)
+    end
+end
+
+function fill_all_lines(wind::WindStruct)
     #initialize them all
     for leaf in allleaves(wind.quadtree)
         leaf.data = [wind.config["wind"]["n_shielding"], 0., 0.01]
@@ -122,64 +147,168 @@ function fill_all_points(wind::WindStruct)
     for line in wind.lines
         #println("filling line ... $k")
         k += 1
-        for i in 2:(length(line.p.n_hist) - 1)
-            point1 = line.p.u_hist[i, 1:2]
-            point2 = line.p.u_hist[i+1, 1:2]
-            rho = line.p.n_hist[i]
-            fm = line.p.fm_hist[i]
-            linewidth_normalized = line.p.line_width / line.p.r_0 
-            fill_point(point1, point2, linewidth_normalized, rho, fm, wind)
-        end
+        fill_line(line, wind)
     end
 end
 
-function refine_mine(wind::WindStruct)
-    fill_all_points(wind)
+#function refine_leaf(leaf, wind::WindStruct)
+#    maxz = vertices(leaf.boundary)[2,2][2]
+#    refinement_condition = (leaf.data[3] > 0.1) && (maxz > wind.config["wind"]["z_0"]) 
+#    if refinement_condition
+#        split!(leaf)
+#    end
+#
+#end
+function split_cell_initialization(cell, child_indices)
+    newdata = [1e2, 0., 0.] 
+    return newdata
+end
+
+function fill_and_refine(currentpoint, previouspoint, linewidth_normalized, n, fm, wind::WindStruct)
+    fill_point(previouspoint, currentpoint, linewidth_normalized, n, fm, wind)
+    lw = linewidth_normalized * currentpoint[1]
+    leaf = findleaf(wind.quadtree, currentpoint)
+    deltad = compute_cell_size(leaf)
+    deltatau = deltad * wind.bh.R_g * SIGMA_T * n
+    leaf.data = [n, fm, deltatau]
+    maxz = vertices(leaf.boundary)[2,2][2]
+    refine_condition = (leaf.data[3] > 0.1) && (maxz > wind.config["wind"]["z_0"]) 
+    if refine_condition
+        split!(leaf, split_cell_initialization)
+        fill_point(previouspoint, currentpoint, linewidth_normalized, n, fm, wind)
+    end
+    optically_thin = !refine_condition
+    while !optically_thin
+        optically_thin = true
+        for children in allleaves(leaf)
+            maxz = vertices(children.boundary)[2,2][2]
+            #println(children.boundary)
+            #println(children.data)
+            refine_condition = (children.data[3] > 0.1) && (maxz > wind.config["wind"]["z_0"]) 
+            if refine_condition
+                optically_thin = false
+                split!(children, split_cell_initialization)
+            end
+        end
+        fill_point(previouspoint, currentpoint, linewidth_normalized, n, fm, wind)
+    end
+end
+
+function refine_line(currentpoint, currentleaf, line, wind::WindStruct)
+    maxz = vertices(currentleaf.boundary)[2,2][2]
+    refine_condition = (currentleaf.data[3] > 0.1) && (maxz > wind.config["wind"]["z_0"]) 
+    if refine_condition
+        split!(currentleaf, split_cell_initialization)
+        fill_line(line, wind)
+    end
+    optically_thin = false
+    while(!optically_thin)
+        optically_thin = true
+        for leaf in allleaves(currentleaf)
+            maxz = vertices(leaf.boundary)[2,2][2]
+            refine_condition = (leaf.data[3] > 0.1) && (maxz > wind.config["wind"]["z_0"]) 
+            #println(leaf.data)
+            if refine_condition
+                optically_thin = false
+                split!(leaf, split_cell_initialization)
+            end
+        end
+        fill_line(line, wind)
+    end
+end
+
+function refine_all(wind::WindStruct)
+    fill_all_lines(wind)
     optically_thin = false
     while (!optically_thin)
         println("refining ...")
         optically_thin = true
         for leaf in allleaves(wind.quadtree)
-            if leaf.data[3] > 0.1
+            maxz = vertices(leaf.boundary)[2,2][2]
+            refine_condition = (leaf.data[3] > 0.1) && (maxz > wind.config["wind"]["z_0"]) 
+            if refine_condition
                 optically_thin = false
                 split!(leaf)
             end
         end
-        fill_all_points(wind)
+        fill_all_lines(wind)
     end
 end
 
-
-
-
-function needs_refinement(r::GridRefinery, cell)
-    cond = cell.data[3] > r.tau_tolerance
-    return cond
-end
-
-function refine_data(r::GridRefinery, cell, indices)
-    fill_all_points(r.wind)
-    return cell.data
-end
-
-function adaptivesampling!(root::Cell, refinery::AbstractRefinery)
-    refinement_queue = [root]
-    refine_function =
-        (cell, indices) -> refine_data(refinery, cell, indices)
-    while !isempty(refinement_queue)
-        cell = pop!(refinement_queue)
-        println("cell: $cell")
-        println("cell data : $(cell.data)")
-        if needs_refinement(refinery, cell)
-            println("needs refinement")
-            split!(cell, refine_function)
-            append!(refinement_queue, children(cell))
+function compute_density_grid(wind::WindStruct)
+    grid = zeros(Float64, 2000, 2001)
+    r_range = range(wind.grids.r_range[1], stop=wind.grids.r_range[end], length=2000)
+    z_range = range(wind.grids.z_range[1], stop=wind.grids.z_range[end], length=2001)
+    for (i, r) in enumerate(r_range)
+        for (j, z) in enumerate(z_range)
+            leaf = findleaf(wind.quadtree, [r,z])
+            dens = leaf.data[1]
+            grid[i,j] = dens
         end
     end
-    root
+    return r_range, z_range, grid
 end
 
-function refine(cell::Cell, wind::WindStruct)
-    r = GridRefinery(0.1, wind)
-    adaptivesampling!(cell, r)
+
+function plot_taux_grid_tree(wind::WindStruct)
+    plt.figure()
+    nr = 50
+    nz = 51
+    grid = zeros(Float64, nr, nz)
+    r_range = range(wind.grids.r_range[1], stop=wind.grids.r_range[end], length=nr)
+    z_range = range(wind.config["wind"]["z_0"], stop=wind.grids.z_range[end], length=nz)
+    for (i, r) in enumerate(r_range)
+        for (j, z) in enumerate(z_range)
+            taux = compute_taux_tree(r, z, wind)
+            grid[i,j] = taux
+        end
+    end
+    plt.pcolormesh(r_range, z_range, grid', norm=LogNorm(vmax=1e1))
+    plt.colorbar()
+    display(gcf())
+end
+
+function plot_density_grid_tree(wind::WindStruct)
+    plt.figure()
+    nr = 500
+    nz = 501
+    grid = zeros(Float64, nr, nz)
+    r_range = range(wind.grids.r_range[1], stop=wind.grids.r_range[end], length=nr)
+    z_range = range(wind.config["wind"]["z_0"], stop=wind.grids.z_range[end], length=nz)
+    for (i, r) in enumerate(r_range)
+        for (j, z) in enumerate(z_range)
+            leaf = findleaf(wind.quadtree, [r,z])
+            dens = leaf.data[1]
+            grid[i,j] = dens
+        end
+    end
+    plt.pcolormesh(r_range, z_range, grid', norm=LogNorm(vmin=1e5, vmax=1e8))
+    plt.colorbar()
+    println("printing grid...")
+    for leaf in allleaves(wind.quadtree)
+        v = hcat(collect(vertices(leaf.boundary))...)
+        x = v[1, [1,2,4,3,1]]
+        y = v[2, [1,2,4,3,1]]
+        plt.plot(x,y, color="black", alpha=0.3)
+    end
+    #for line in wind.lines
+    #    plt.plot(line.p.u_hist[:,1], line.p.u_hist[:,2], color="white", linewidth=0.5)
+    #end
+    display(gcf())
+end
+
+function plot_tricontour(wind::WindStruct)
+    r_range = []
+    z_range = []
+    rho_range = []
+    for leaf in allleaves(wind.quadtree)
+        r, z = center(leaf)
+        rho = leaf.data[1]
+        push!(r_range, r)
+        push!(z_range, z)
+        push!(rho_range, rho)
+    end
+    plt.figure()
+    #plt.tripcolor(r_range, z_range, rho_range, norm=LogNorm())
+    plt.tricontourf(r_range, z_range, rho_range, 20, norm=LogNorm())
 end

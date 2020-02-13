@@ -40,8 +40,9 @@ function start_lines(wind::WindStruct)
             solve!(line)
             write_line(wind.config["general"]["save_path"], line.p, it_num)
         end
+        refine_all(wind)
         write_properties_and_grids(wind.config["general"]["save_path"], wind, it_num)
-        is_first_iter = false
+        #is_first_iter = false
     end
 end
 

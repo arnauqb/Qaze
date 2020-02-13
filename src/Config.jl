@@ -1,7 +1,7 @@
 export initialize
 #ENV["PYCALL_JL_RUNTIME_PYTHON"]="/home/arnau/Documents/qwind/env/bin/python"
 using PyCall
-using RegionTrees: Cell
+using RegionTrees: Cell, split!, allleaves
 
 
 function initialize(config::String)
@@ -54,7 +54,13 @@ function initialize(config::Dict)
     quadtree_max_height = config["grids"]["z_max"]
     n_shielding = config["wind"]["n_shielding"]
     delta_tau_0 = n_shielding * sqrt(quadtree_max_height^2 + quadtree_max_radius^2) * R_g * SIGMA_T
-    quadtree = Cell(SVector(0., 0.), SVector(quadtree_max_radius, quadtree_max_height), [n_shielding, 0., delta_tau_0])
+    quadtree = Cell(SVector(0., 0.), SVector(2 * quadtree_max_radius, 2* quadtree_max_height), [n_shielding, 0., delta_tau_0])
+    split!(quadtree)
+    for i in 1:config["grids"]["tree_initial_divisions"] - 1
+        for leaf in allleaves(quadtree)
+            split!(leaf)
+        end
+    end
     wind = WindStruct(config, bh, sed, grids, quadtree, rad, lines, lines_initial_radius, lines_range, lines_widths)
     initialize_uv_fraction(wind)
     initialize_json(config["general"]["save_path"], wind)

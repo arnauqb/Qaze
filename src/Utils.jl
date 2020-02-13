@@ -7,6 +7,10 @@ function logrange(start, stop, length)
     return 10 .^log_range
 end
 
+function distance2d(point1, point2)
+    return sqrt( (point1[1]-point2[1])^2 + (point2[2] - point1[2])^2 )
+end
+
 function drawline(x1::Int64, y1::Int64, x2::Int64, y2::Int64)
     x=x1
     y=y1

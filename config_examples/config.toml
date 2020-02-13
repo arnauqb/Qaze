@@ -18,13 +18,14 @@ mu = 1.0
 [grids]
 r_min = 0.0
 z_min = 0.0
-r_max = 1000.0
-z_max = 500.0
+r_max = 3000.0
+z_max = 3000.0
 n_r = 50
 n_z = 51
 n_r_disk = 501 
 n_phi_disk = 251
 log_spaced = false 
+tree_initial_divisions = 2
 
 [radiation]
 f_uv = "auto" 
@@ -43,13 +44,13 @@ tau_x_ignore_grid = false
 [wind]
 initial_radius = "warm_radius" 
 final_radius = 1000.0
-number_streamlines = 20
-iterations = 1
+number_streamlines = 60
+iterations = 5
 log_spaced = false
 n_shielding = 1e2
 wind_temperature = "disk"
 initial_conditions = "manual"
-n_0 = "cak"
+n_0 = 1e10
 v_0 = "thermal"
 z_0 = 1.0
 solver_rtol = 1e-2

@@ -67,6 +67,7 @@ mutable struct StreamlineStruct
     l::Float64 # specific angular momentum
     line_width::Float64
     escaped::Bool
+    outofdomain::Bool
     crossing_counter::Int64
     u_hist::Array{Float64,2}
     n_hist::Array{Float64,1}

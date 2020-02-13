@@ -25,6 +25,7 @@ n_z = 50
 n_r_disk = 101 
 n_phi_disk = 251
 log_spaced = false
+tree_initial_divisions = 6
 
 [radiation]
 f_uv = "auto" 

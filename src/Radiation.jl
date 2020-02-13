@@ -1,5 +1,5 @@
-export thermal_velocity, eddington_luminosity, initialize_uv_fraction, nt_rel_factors, opacity_x, compute_tau_x, ionization_parameter,
-       compute_tau_eff, force_multiplier, force_radiation
+export thermal_velocity, eddington_luminosity, initialize_uv_fraction, nt_rel_factors, opacity_x, compute_taux_grid, ionization_parameter,
+       compute_tau_eff, force_multiplier, force_radiation, compute_taux_leaf, compute_tau_x
 
 function thermal_velocity(T, mu = 1.)
     v = sqrt(K_B * T / (mu * M_P)) / C
@@ -80,7 +80,7 @@ function compute_tau_x_old(r, z, wind::WindStruct)
     return tau
 end
 
-function compute_tau_x(r, z, wind::WindStruct)
+function compute_taux_grid(r, z, wind::WindStruct)
     if r <= wind.grids.r_range[1] || z < 0
         return 0.
     end
@@ -171,6 +171,48 @@ function compute_tau_x(r, z, wind::WindStruct)
     end
     tau += density * SIGMA_T * deltad * opacity_x(xi)
     return tau
+end
+
+function compute_taux_leaf(point, intersection, leaf, wind::WindStruct)
+    deltad = distance2d(point, intersection) * wind.bh.R_g
+    d = distance2d([0.,wind.config["wind"]["z_0"]], point) * wind.bh.R_g
+    density = leaf.data[1]
+    xi0 = wind.radiation.xray_luminosity / (density * d^2)
+    taux = 0.
+    xi = xi0
+    for i = 1:2
+        taux = density * opacity_x(xi) * deltad * SIGMA_T
+        xi = xi0 * exp(-taux)
+    end
+    #println("point :$point, den : $density")
+    taux = density * opacity_x(xi) * deltad * SIGMA_T
+    return taux
+end
+
+function compute_tau_x(r, z, wind::WindStruct)
+    z = max(z, wind.config["wind"]["z_0"])
+    r = max(r,0.)
+    point1 = [0.0, wind.config["wind"]["z_0"]]
+    point1leaf = findleaf(wind.quadtree, point1)
+    point2 = [r,z]
+    point2leaf = findleaf(wind.quadtree, point2)
+    if point1leaf == point2leaf
+        taux = compute_taux_leaf(point1, point2, point1leaf, wind)
+        return taux
+    end
+    intersection = compute_cell_intersection(point1, point1leaf, point1, point2)
+    taux = compute_taux_leaf(point1, intersection, point1leaf, wind)
+    currentpoint = intersection
+    currentleaf = findleaf(wind.quadtree, currentpoint)
+    while currentleaf != point2leaf
+        intersection = compute_cell_intersection(currentpoint, currentleaf, point1, point2)
+        taux += compute_taux_leaf(currentpoint, intersection, currentleaf, wind)
+        #println("r : $r,z : $z")
+        currentpoint = intersection
+        currentleaf = findleaf(wind.quadtree, currentpoint)
+    end
+    taux += compute_taux_leaf(currentpoint, point2, currentleaf, wind)
+    return taux
 end
 
 function ionization_parameter(r, z, density, tau_x, wind::WindStruct)
