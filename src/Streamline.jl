@@ -29,7 +29,7 @@ function initialize_line(line_id, r_0, z_0, v_0, n_0, v_th, wind::WindStruct)
     saving_cb = SavingCallback(save, saved_values_type)
     cb = CallbackSet(termination_cb, saving_cb)
     problem = DAEProblem(residual!, du0, u0, tspan, p=line, differential_vars=[true, true, true, true])
-    integrator = init(problem, IDA(), callback=cb, dtmax=5e-2 * wind.bh.R_g / C)
+    integrator = init(problem, IDA(), callback=cb)#, dtmax=5e-2 * wind.bh.R_g / C)
     integrator.opts.abstol = 0.
     integrator.opts.reltol = wind.config["wind"]["solver_rtol"]
     return integrator
@@ -63,9 +63,11 @@ function residual!(resid, du, u, line, t)
     r, z, v_r, v_z = u
     r_dot, z_dot, v_r_dot, v_z_dot = du
     if r < 0 || z < 0
-        println("warning, out of domain")
-        a_r = 0.
-        a_z = 0.
+        #println("warning, out of domain")
+        fg = gravity(r, z, line.wind.bh)
+        centrifugal_term = line.l^2 / r^3
+        a_r = fg[1] + centrifugal_term
+        a_z = fg[2]
         resid[1] = r_dot - v_r
         resid[2] = z_dot - v_z
         resid[3] = v_r_dot - a_r
@@ -107,8 +109,8 @@ function condition(u, t, integrator)
             crossing_condition = true
         end
     end
-    escaped_condition = (r > integrator.p.wind.grids.r_range[end]) || (z > integrator.p.wind.grids.z_range[end])
-    failed_condtion = z < integrator.p.z_0 
+    escaped_condition = (r >= integrator.p.wind.grids.r_range[end]) || (z >= integrator.p.wind.grids.z_range[end])
+    failed_condtion = z < integrator.p.z_0  || r < 0.
     cond = escaped_condition | failed_condtion | crossing_condition
     return cond
 end
@@ -147,7 +149,11 @@ function save(u, t, integrator)
     #fill_point(currentpoint, previouspoint, linewidth_normalized, n, fm, integrator.p.wind)
     #currentleaf = findleaf(integrator.p.wind.quadtree, [r,z])
     #refine_line([r,z], currentleaf, integrator, integrator.p.wind)
-    fill_and_refine(currentpoint, previouspoint, linewidth_normalized, n, fm, integrator.p.wind)
+    if any(currentpoint .< 0)
+        terminate!(integrator)
+        return u
+    end
+    fill_and_refine(previouspoint, currentpoint, linewidth_normalized, n, fm, integrator.p.wind)
     integrator.p.u_hist = [integrator.p.u_hist ; transpose(u)]
     push!(integrator.p.fm_hist, fm)
     push!(integrator.p.n_hist, n)

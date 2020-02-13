@@ -1,10 +1,10 @@
 using RegionTrees: vertices, Cell, findleaf, children, split!
-import Base: copy
+import Base: copy, isequal, ==
 using StaticArrays: SVector
 using RegionTrees
 export compute_cell_intersection, compute_cell_size, fill_linewidth, fill_point, 
 fill_all_lines, copy, refine_all, refine_leaf, compute_density_grid, 
-plot_density_grid_tree, plot_tricontour, plot_taux_grid_tree, fill_line, refine_line, fill_and_refine
+plot_density_grid_tree, plot_tricontour, plot_taux_grid_tree, fill_line, refine_line, fill_and_refine, fill_and_refine_linewidth
 using PyPlot
 LogNorm = matplotlib.colors.LogNorm
 
@@ -18,6 +18,14 @@ end
 function copy(cell::Cell)
     newcell = Cell(cell.boundary, cell.data)
     return newcell
+end
+
+function isequal(cell1::Cell, cell2::Cell)
+    return cell1.boundary == cell2.boundary
+end
+
+function ==(cell1::Cell, cell2::Cell)
+    return cell1.boundary == cell2.boundary
 end
 
 function compute_cell_intersection(current_point, cell::Cell, initial_point, final_point)
@@ -55,7 +63,7 @@ function compute_cell_intersection(current_point, cell::Cell, initial_point, fin
         println("cell: $cell")
         println("initial point: $initial_point")
         println("final point: $final_point")
-        @assert lambda >= 0.0
+        throw(DomainError)
     end
     intersection = [r, z] + lambda .* [r_f - r_i, z_f - z_i]
     return intersection
@@ -76,11 +84,7 @@ function fill_linewidth(point, linewidth, density, fm, wind::WindStruct)
     deltad = compute_cell_size(currentleaf)
     deltatau = sigmarg * deltad * n_fill
     currentleaf.data = [n_fill, fm_fill, deltatau]
-    #println("pointleaf: $currentleaf")
-    #println("deltad: $deltad, deltatau: $deltatau")
     while (currentleaf != point2leaf)
-        #println("lwidth")
-        #println("point1 : $point1, point2 : $point2")
         currentpoint = compute_cell_intersection(currentpoint, currentleaf, point1, point2)
         currentleaf = findleaf(wind.quadtree, currentpoint)
         if currentleaf.boundary == previousleaf.boundary
@@ -91,7 +95,6 @@ function fill_linewidth(point, linewidth, density, fm, wind::WindStruct)
         fm_fill = max(fm, currentleaf.data[2])
         deltad = compute_cell_size(currentleaf)
         deltatau = sigmarg * deltad * n_fill
-        #println("deltad: $deltad, deltatau: $deltatau")
         currentleaf.data = [n_fill, fm_fill, deltatau]
         previousleaf = copy(currentleaf)
     end
@@ -151,69 +154,92 @@ function fill_all_lines(wind::WindStruct)
     end
 end
 
-#function refine_leaf(leaf, wind::WindStruct)
-#    maxz = vertices(leaf.boundary)[2,2][2]
-#    refinement_condition = (leaf.data[3] > 0.1) && (maxz > wind.config["wind"]["z_0"]) 
-#    if refinement_condition
-#        split!(leaf)
-#    end
-#
-#end
 function split_cell_initialization(cell, child_indices)
     newdata = [1e2, 0., 0.] 
     return newdata
 end
 
-function fill_and_refine(currentpoint, previouspoint, linewidth_normalized, n, fm, wind::WindStruct)
-    fill_point(previouspoint, currentpoint, linewidth_normalized, n, fm, wind)
-    lw = linewidth_normalized * currentpoint[1]
-    leaf = findleaf(wind.quadtree, currentpoint)
-    deltad = compute_cell_size(leaf)
-    deltatau = deltad * wind.bh.R_g * SIGMA_T * n
-    leaf.data = [n, fm, deltatau]
-    maxz = vertices(leaf.boundary)[2,2][2]
-    refine_condition = (leaf.data[3] > 0.1) && (maxz > wind.config["wind"]["z_0"]) 
-    if refine_condition
-        split!(leaf, split_cell_initialization)
-        fill_point(previouspoint, currentpoint, linewidth_normalized, n, fm, wind)
-    end
-    optically_thin = !refine_condition
+function refine_leaf(currentpoint, leaf, n, fm, wind)
+    optically_thin = false
     while !optically_thin
         optically_thin = true
-        for children in allleaves(leaf)
-            maxz = vertices(children.boundary)[2,2][2]
-            #println(children.boundary)
-            #println(children.data)
-            refine_condition = (children.data[3] > 0.1) && (maxz > wind.config["wind"]["z_0"]) 
-            if refine_condition
-                optically_thin = false
-                split!(children, split_cell_initialization)
-            end
+        maxz = vertices(leaf.boundary)[2,2][2]
+        refine_condition = (leaf.data[3] > 0.1) && (maxz > wind.config["wind"]["z_0"]) 
+        if refine_condition
+            optically_thin = false
+            split!(leaf, split_cell_initialization)
+            newleaf = findleaf(leaf, currentpoint)
+            deltad = compute_cell_size(newleaf)
+            deltatau = n * SIGMA_T * wind.bh.R_g * deltad
+            newleaf.data = [n, fm, deltatau]
+            leaf = newleaf
         end
-        fill_point(previouspoint, currentpoint, linewidth_normalized, n, fm, wind)
     end
 end
 
-function refine_line(currentpoint, currentleaf, line, wind::WindStruct)
-    maxz = vertices(currentleaf.boundary)[2,2][2]
-    refine_condition = (currentleaf.data[3] > 0.1) && (maxz > wind.config["wind"]["z_0"]) 
-    if refine_condition
-        split!(currentleaf, split_cell_initialization)
-        fill_line(line, wind)
+
+function fill_and_refine_linewidth(point, linewidth, density, fm, wind::WindStruct)
+    r_min = 0 
+    r_max = 6000 
+    point1 = [max(point[1] - linewidth / 2., r_min) , point[2]] 
+    point2 = [min(point[1] + linewidth / 2., r_max) , point[2]] 
+    sigmarg = SIGMA_T * wind.bh.R_g
+    currentpoint = copy(point1)
+    currentleaf = findleaf(wind.quadtree, point1)
+    point2leaf = findleaf(wind.quadtree, point2)
+    n_fill = max(density, currentleaf.data[1])
+    fm_fill = max(fm, currentleaf.data[2])
+    deltad = compute_cell_size(currentleaf)
+    deltatau = sigmarg * deltad * n_fill
+    currentleaf.data = [n_fill, fm_fill, deltatau]
+    refine_leaf(currentpoint, currentleaf, n_fill, fm_fill, wind)
+    currentleaf = findleaf(wind.quadtree, currentpoint)
+    point2leaf = findleaf(wind.quadtree, point2)
+    while (currentleaf != point2leaf)
+        currentpoint = compute_cell_intersection(currentpoint, currentleaf, point1, point2)
+        currentleaf = findleaf(wind.quadtree, currentpoint)
+        n_fill = max(density, currentleaf.data[1])
+        fm_fill = max(fm, currentleaf.data[2])
+        deltad = compute_cell_size(currentleaf)
+        deltatau = sigmarg * deltad * n_fill
+        currentleaf.data = [n_fill, fm_fill, deltatau]
+        refine_leaf(currentpoint, currentleaf, n_fill, fm_fill, wind)
+        currentleaf = findleaf(wind.quadtree, currentpoint)
+        point2leaf = findleaf(wind.quadtree, point2)
     end
-    optically_thin = false
-    while(!optically_thin)
-        optically_thin = true
-        for leaf in allleaves(currentleaf)
-            maxz = vertices(leaf.boundary)[2,2][2]
-            refine_condition = (leaf.data[3] > 0.1) && (maxz > wind.config["wind"]["z_0"]) 
-            #println(leaf.data)
-            if refine_condition
-                optically_thin = false
-                split!(leaf, split_cell_initialization)
-            end
+end
+
+function fill_and_refine(point1, point2, linewidth_normalized, n, fm, wind::WindStruct)
+    lw = linewidth_normalized * point1[1]
+    point1leaf = findleaf(wind.quadtree, point1)
+    currentpoint = copy(point1)
+    currentleaf = copy(point1leaf)
+    previousleaf = copy(currentleaf)
+    point2leaf = findleaf(wind.quadtree, point2)
+    fill_and_refine_linewidth(currentpoint, lw, n, fm, wind)
+    currentleaf = findleaf(wind.quadtree, currentpoint)
+    point2leaf = findleaf(wind.quadtree, point2)
+    while(currentleaf != point2leaf)
+        try
+            currentpoint = compute_cell_intersection(currentpoint, currentleaf, point1, point2)
+        catch
+            println("currentpoint : $currentpoint")
+            println("currentleaf: $currentleaf")
+            println("point1: $point1")
+            println("point2: $point2")
+            println("point1leaf: $point1leaf")
+            println("point2leaf: $point2leaf")
+            throw(DomainError)
         end
-        fill_line(line, wind)
+        currentleaf = findleaf(wind.quadtree, currentpoint)
+        if currentleaf == previousleaf
+            currentpoint .-= 1e-8
+            currentleaf = findleaf(wind.quadtree, currentpoint)
+        end
+        fill_and_refine_linewidth(currentpoint, lw, n, fm , wind)
+        currentleaf = findleaf(wind.quadtree, currentpoint)
+        point2leaf = findleaf(wind.quadtree, point2)
+        previousleaf = copy(currentleaf) 
     end
 end
 
@@ -294,7 +320,7 @@ function plot_density_grid_tree(wind::WindStruct)
     #for line in wind.lines
     #    plt.plot(line.p.u_hist[:,1], line.p.u_hist[:,2], color="white", linewidth=0.5)
     #end
-    display(gcf())
+    #display(gcf())
 end
 
 function plot_tricontour(wind::WindStruct)

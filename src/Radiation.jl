@@ -189,30 +189,40 @@ function compute_taux_leaf(point, intersection, leaf, wind::WindStruct)
     return taux
 end
 
-function compute_tau_x(r, z, wind::WindStruct)
+function compute_tau_x(r, z, wind::WindStruct ; return_coords = false)
     z = max(z, wind.config["wind"]["z_0"])
-    r = max(r,0.)
+    @assert z >= 0
+    #r = max(r,0.)
     point1 = [0.0, wind.config["wind"]["z_0"]]
+    coords_list = [point1]
     point1leaf = findleaf(wind.quadtree, point1)
     point2 = [r,z]
     point2leaf = findleaf(wind.quadtree, point2)
     if point1leaf == point2leaf
+        push!(coords_list, point2)
         taux = compute_taux_leaf(point1, point2, point1leaf, wind)
         return taux
     end
     intersection = compute_cell_intersection(point1, point1leaf, point1, point2)
     taux = compute_taux_leaf(point1, intersection, point1leaf, wind)
     currentpoint = intersection
+    push!(coords_list, intersection)
     currentleaf = findleaf(wind.quadtree, currentpoint)
     while currentleaf != point2leaf
         intersection = compute_cell_intersection(currentpoint, currentleaf, point1, point2)
+        push!(coords_list, intersection)
         taux += compute_taux_leaf(currentpoint, intersection, currentleaf, wind)
         #println("r : $r,z : $z")
         currentpoint = intersection
         currentleaf = findleaf(wind.quadtree, currentpoint)
     end
     taux += compute_taux_leaf(currentpoint, point2, currentleaf, wind)
-    return taux
+    push!(coords_list, point2)
+    if return_coords
+        return taux, coords_list
+    else
+        return taux
+    end
 end
 
 function ionization_parameter(r, z, density, tau_x, wind::WindStruct)
