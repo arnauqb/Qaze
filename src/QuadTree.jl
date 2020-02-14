@@ -144,7 +144,7 @@ end
 function fill_all_lines(wind::WindStruct)
     #initialize them all
     for leaf in allleaves(wind.quadtree)
-        leaf.data = [wind.config["wind"]["n_shielding"], 0., 0.01]
+        leaf.data = [wind.config["wind"]["n_vacuum"], 0., 0.01]
     end
     k=1
     for line in wind.lines
@@ -176,7 +176,6 @@ function refine_leaf(currentpoint, leaf, n, fm, wind)
         end
     end
 end
-
 
 function fill_and_refine_linewidth(point, linewidth, density, fm, wind::WindStruct)
     r_min = 0 
@@ -275,7 +274,6 @@ function compute_density_grid(wind::WindStruct)
     return r_range, z_range, grid
 end
 
-
 function plot_taux_grid_tree(wind::WindStruct)
     plt.figure()
     nr = 50
@@ -337,4 +335,9 @@ function plot_tricontour(wind::WindStruct)
     plt.figure()
     #plt.tripcolor(r_range, z_range, rho_range, norm=LogNorm())
     plt.tricontourf(r_range, z_range, rho_range, 20, norm=LogNorm())
+end
+
+function erase_line_from_tree(line_id, wind::WindStruct)
+    line = wind.lines[line_id]
+    n_
 end

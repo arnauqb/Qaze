@@ -92,7 +92,7 @@ function compute_taux_grid(r, z, wind::WindStruct)
     deltad = 0.
     r2 = wind.grids.r_range[1]
     z2 = m * r2
-    tau = sqrt(r2^2 + z2^2) * wind.bh.R_g * SIGMA_T * wind.config["wind"]["n_shielding"]
+    tau = sqrt(r2^2 + z2^2) * wind.bh.R_g * SIGMA_T * wind.config["wind"]["n_vacuum"]
     rp_arg = 1
     zp_arg = get_index(wind.grids.z_range, z2)
     lambda_r = 0.

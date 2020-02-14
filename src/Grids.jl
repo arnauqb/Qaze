@@ -31,7 +31,7 @@ function initialize_grids(config::Dict, qsosed)
         z_range,
         sqrt(r_max^2 + z_max^2), # d_max
         disk_range,
-        config["wind"]["n_shielding"] * ones(Float64, n_r, n_z), #density
+        config["wind"]["n_vacuum"] * ones(Float64, n_r, n_z), #density
         zeros(Float64, n_lines, n_r, n_z), # density lines
         zeros(Float64, n_r, n_z), #tau_x
         zeros(Float64, n_r, n_z), #ionization
@@ -152,7 +152,7 @@ function refine_density_grid(wind::WindStruct)
         z_range_new,
         sqrt(wind.grids.r_range[end]^2 + wind.grids.z_range[end]^2), # d_max
         wind.grids.disk_range,
-        wind.config["wind"]["n_shielding"] * ones(Float64, newsize_r, newsize_z), #density
+        wind.config["wind"]["n_vacuum"] * ones(Float64, newsize_r, newsize_z), #density
         zeros(Float64, wind.grids.n_lines, newsize_r, newsize_z), # density lines
         zeros(Float64, newsize_r, newsize_z), #tau_x
         zeros(Float64, newsize_r, newsize_z), #ionization

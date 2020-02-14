@@ -27,7 +27,8 @@ function initialize_line(line_id, r_0, z_0, v_0, n_0, v_th, wind::WindStruct)
     termination_cb = DiscreteCallback(condition, affect, save_positions=(false, false))
     saved_values_type = SavedValues(Float64, Array{Float64,1})
     saving_cb = SavingCallback(save, saved_values_type)
-    cb = CallbackSet(termination_cb, saving_cb)
+    steadystate_cb = TerminateSteadyState(1e-8, 1e-6) 
+    cb = CallbackSet(termination_cb, saving_cb, steadystate_cb)
     problem = DAEProblem(residual!, du0, u0, tspan, p=line, differential_vars=[true, true, true, true])
     integrator = init(problem, IDA(), callback=cb)#, dtmax=5e-2 * wind.bh.R_g / C)
     integrator.opts.abstol = 0.
@@ -109,9 +110,17 @@ function condition(u, t, integrator)
             crossing_condition = true
         end
     end
+    stalling_condition = false
+    z_hist = integrator.p.u_hist[:,2]
+    if length(z_hist) > 200
+        if std(z_hist[end-10:end]) < 0.02
+            println("stalled")
+            stalling_condition = true
+        end
+    end
     escaped_condition = (r >= integrator.p.wind.grids.r_range[end]) || (z >= integrator.p.wind.grids.z_range[end])
     failed_condtion = z < integrator.p.z_0  || r < 0.
-    cond = escaped_condition | failed_condtion | crossing_condition
+    cond = escaped_condition | failed_condtion | crossing_condition | stalling_condition
     return cond
 end
 

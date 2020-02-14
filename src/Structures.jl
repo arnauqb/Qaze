@@ -78,8 +78,3 @@ mutable struct StreamlineStruct
     a_r_hist::Array{Float64,1}
     a_z_hist::Array{Float64,1}
 end
-
-struct GridRefinery <: AbstractRefinery
-    tau_tolerance::Float64
-    wind::WindStruct
-end

@@ -23,12 +23,12 @@ function start_lines(wind::WindStruct)
     wind.radiation.taufm = false
     for it_num in 1:wind.config["wind"]["iterations"]
         #wind.grids.density_lines[:,:,:] .= 0.
-        ##wind.grids.density[:,:] .= wind.config["wind"]["n_shielding"]
+        ##wind.grids.density[:,:] .= wind.config["wind"]["n_vacuum"]
         #wind.grids.fm_lines[:,:,:] .= 0.
         #wind.grids.fm[:,:] .= 0.
-        if it_num >= 3
+        if it_num >= 2
             wind.radiation.taufm = true
-            update_mdot_grid(wind)
+            #update_mdot_grid(wind)
         end
         for (i, r) in enumerate(wind.lines_range)
             if !is_first_iter
@@ -52,7 +52,7 @@ function start_lines_animation(wind::WindStruct)
     density_grids = []
     for it_num in 1:wind.config["wind"]["iterations"]
         wind.grids.density_lines[:,:,:] .= 0.
-        wind.grids.density[:,:] .= wind.config["wind"]["n_shielding"]
+        wind.grids.density[:,:] .= wind.config["wind"]["n_vacuum"]
         wind.grids.fm_lines[:,:,:] .= 0.
         wind.grids.fm[:,:] .= 0.
         if it_num >= 3
