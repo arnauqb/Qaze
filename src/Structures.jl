@@ -44,7 +44,8 @@ mutable struct RadiationStruct
     f_x::Float64
     xray_luminosity::Float64
     force_constant::Float64
-    taufm::Bool
+    include_tauuv::Bool
+    include_fm_in_tauuv::Bool
 end
 
 mutable struct WindStruct

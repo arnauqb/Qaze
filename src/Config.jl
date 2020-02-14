@@ -48,7 +48,7 @@ function initialize(config::Dict)
     bol_lumin = bh.mdot * edd_lumin
     xray_lumin = f_x * bol_lumin
     force_constant = 3 / (8 * pi * bh.eta)
-    rad = RadiationStruct(bol_lumin, edd_lumin, f_uv, f_x, xray_lumin, force_constant, false)
+    rad = RadiationStruct(bol_lumin, edd_lumin, f_uv, f_x, xray_lumin, force_constant, false, true)
     lines = Array{Any,1}(undef, config["wind"]["number_streamlines"])
     quadtree_max_radius = config["grids"]["r_max"]
     quadtree_max_height = config["grids"]["z_max"]

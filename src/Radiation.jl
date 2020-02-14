@@ -236,6 +236,7 @@ function compute_tau_eff(density, dv_dr, v_th)
     if dv_dr == 0
         return 1.
     end
+    @assert density >= 0
     t = density * SIGMA_T * abs(v_th / dv_dr)
     return t
 end
@@ -256,6 +257,8 @@ function force_multiplier_eta(xi)
 end
 
 function force_multiplier(t, xi)
+    @assert t>= 0
+    @assert xi>= 0
     ALPHA = 0.6
     TAU_MAX_TOL = 1e-3
     k = force_multiplier_k(xi)

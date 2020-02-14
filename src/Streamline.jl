@@ -5,6 +5,8 @@ using Statistics
 using RegionTrees
 
 function compute_density(r, z, v_T, line::StreamlineStruct)
+    @assert r >= 0
+    @assert z >= 0
     d = sqrt(r^2 + z^2)
     radial = (line.r_0 / d)^2
     v_ratio = line.v_0 / v_T
@@ -45,7 +47,7 @@ function compute_initial_acceleration(r_0, z_0, v_0, n_0, v_th, l, wind::WindStr
     tau_x = compute_tau_x(r_0, z_0, wind)
     xi = ionization_parameter(r_0, z_0, n_0, tau_x, wind)
     fm = force_multiplier(1, xi)
-    fr = force_radiation(r_0, z_0, fm, wind, include_tau_uv=wind.radiation.taufm)
+    fr = force_radiation(r_0, z_0, fm, wind, include_tau_uv=wind.radiation.include_tauuv)
     centrifugal_term = l^2 / r_0^3
     a_r = fg[1] + fr[1] + centrifugal_term
     a_z = fg[2] + fr[2] 
@@ -54,7 +56,7 @@ function compute_initial_acceleration(r_0, z_0, v_0, n_0, v_th, l, wind::WindStr
     dv_dr = a_T / v_0
     tau_eff = compute_tau_eff(n_0, dv_dr, v_th)
     fm = force_multiplier(tau_eff, xi)
-    fr = force_radiation(r_0, z_0, fm, wind, include_tau_uv=wind.radiation.taufm)
+    fr = force_radiation(r_0, z_0, fm, wind, include_tau_uv=wind.radiation.include_tauuv)
     a_r = fg[1] + fr[1] + centrifugal_term
     a_z = fg[2] + fr[2] 
     return [a_r, a_z, fm, xi, dv_dr, tau_x]
@@ -84,7 +86,7 @@ function residual!(resid, du, u, line, t)
     xi = ionization_parameter(r, z, n, tau_x, line.wind)
     tau_eff = compute_tau_eff(n, dv_dr, line.v_th)
     fm = force_multiplier(tau_eff, xi)
-    fr = force_radiation(r, z, fm, line.wind, include_tau_uv=line.wind.radiation.taufm)
+    fr = force_radiation(r, z, fm, line.wind, include_tau_uv=line.wind.radiation.include_tauuv)
     centrifugal_term = line.l^2 / r^3
     a_r = fg[1] + fr[1] + centrifugal_term
     a_z = fg[2] + fr[2] 
@@ -111,13 +113,13 @@ function condition(u, t, integrator)
         end
     end
     stalling_condition = false
-    z_hist = integrator.p.u_hist[:,2]
-    if length(z_hist) > 200
-        if std(z_hist[end-10:end]) < 0.02
-            println("stalled")
-            stalling_condition = true
-        end
-    end
+    #z_hist = integrator.p.u_hist[:,2]
+    #if length(z_hist) > 200
+    #    if std(z_hist[end-10:end]) < 0.02
+    #        println("stalled")
+    #        stalling_condition = true
+    #    end
+    #end
     escaped_condition = (r >= integrator.p.wind.grids.r_range[end]) || (z >= integrator.p.wind.grids.z_range[end])
     failed_condtion = z < integrator.p.z_0  || r < 0.
     cond = escaped_condition | failed_condtion | crossing_condition | stalling_condition
@@ -135,6 +137,10 @@ end
 
 function save(u, t, integrator)
     r, z, v_r, v_z = u
+    if any([r,z] .< 0)
+        terminate!(integrator)
+        return u
+    end
     du = get_du(integrator)
     v_r_dot, v_z_dot, a_r, a_z = du
     v_T = sqrt(v_r^2 + v_z^2)
@@ -158,10 +164,6 @@ function save(u, t, integrator)
     #fill_point(currentpoint, previouspoint, linewidth_normalized, n, fm, integrator.p.wind)
     #currentleaf = findleaf(integrator.p.wind.quadtree, [r,z])
     #refine_line([r,z], currentleaf, integrator, integrator.p.wind)
-    if any(currentpoint .< 0)
-        terminate!(integrator)
-        return u
-    end
     fill_and_refine(previouspoint, currentpoint, linewidth_normalized, n, fm, integrator.p.wind)
     integrator.p.u_hist = [integrator.p.u_hist ; transpose(u)]
     push!(integrator.p.fm_hist, fm)
