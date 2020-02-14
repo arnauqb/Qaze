@@ -52,9 +52,8 @@ function initialize(config::Dict)
     lines = Array{Any,1}(undef, config["wind"]["number_streamlines"])
     quadtree_max_radius = config["grids"]["r_max"]
     quadtree_max_height = config["grids"]["z_max"]
-    n_vacuum = config["wind"]["n_vacuum"]
-    delta_tau_0 = n_vacuum * sqrt(quadtree_max_height^2 + quadtree_max_radius^2) * R_g * SIGMA_T
-    quadtree = Cell(SVector(0., 0.), SVector(2 * quadtree_max_radius, 2* quadtree_max_height), [n_vacuum, 0., delta_tau_0])
+    delta_tau_0 = grids.n_vacuum * sqrt(quadtree_max_height^2 + quadtree_max_radius^2) * R_g * SIGMA_T
+    quadtree = Cell(SVector(0., 0.), SVector(2 * quadtree_max_radius, 2* quadtree_max_height), [grids.n_vacuum, 0., delta_tau_0])
     #split!(quadtree)
     #for i in 1:config["grids"]["tree_initial_divisions"] - 1
     #    for leaf in allleaves(quadtree)

@@ -22,7 +22,7 @@ end
         for z in z_range
             tau_truth = wind.grids.n_vacuum * sqrt.(r^2 + (z - wind.config["wind"]["z_0"])^2) * SIGMA_T * wind.bh.R_g
             tauuv = compute_tau_x(r, z, wind)
-            @test tauuv ≈ tau_truth rtol=1e-4 atol=0
+            @test tauuv ≈ tau_truth rtol=1e-2 atol=0
         end
     end
 end

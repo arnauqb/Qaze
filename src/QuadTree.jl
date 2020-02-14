@@ -268,7 +268,7 @@ function fill_and_refine_all_lines(wind::WindStruct)
             continue
         end
         line = wind.lines[i]
-        fill_and_refine_line(line)
+        fill_and_refine_line(line, wind)
     end
 end
 
@@ -368,12 +368,10 @@ function plot_tricontour(wind::WindStruct)
 end
 
 function erase_line_from_tree(line_id, wind::WindStruct)
-    println("resetting tree...")
     reinitialize_tree(wind)
     line = wind.lines[line_id]
     n_vacuum = wind.grids.n_vacuum
-    line.n_hist .= n_vacuum * ones(Float64, size(line.n_hist))
-    line.fm_hist .= zeros(Float64, size(line.fm_hist))
-    println("refilling and refining all lines...")
+    line.p.n_hist .= n_vacuum * ones(Float64, size(line.p.n_hist))
+    line.p.fm_hist .= zeros(Float64, size(line.p.fm_hist))
     fill_and_refine_all_lines(wind)
 end

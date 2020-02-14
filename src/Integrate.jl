@@ -137,7 +137,7 @@ function tau_uv_disk_blob(r_d, phi_d, r, z, wind::WindStruct)
     if r_d > r
         backwards = true
     end
-    point1 = [r_d, 0.]
+    point1 = [r_d, wind.config["wind"]["z_0"]]
     point1leaf = findleaf(wind.quadtree, point1)
     point2 = [r,z]
     point2leaf = findleaf(wind.quadtree, point2)

@@ -1,3 +1,5 @@
+using Printf
+
 export initialize_line, start_lines, compute_line_mdot, compute_wind_mdot,
        compute_kinetic_luminosity, compute_maximum_velocity, start_lines_animation
 
@@ -28,17 +30,17 @@ function start_lines(wind::WindStruct)
         end
         for (i, r) in enumerate(wind.lines_range)
             if !is_first_iter
-                erase_line_from_grid(i, wind)
+                erase_line_from_tree(i, wind)
             end
             line = initialize_line(i, r, wind)
             wind.lines[i] = line
-            print("\nSolving line $i of $(length(wind.lines))")
+            @printf("\nSolving line %02d of %02d ", i, length(wind.lines))
             solve!(line)
             write_line(wind.config["general"]["save_path"], line.p, it_num)
         end
         refine_all(wind)
         write_properties_and_grids(wind.config["general"]["save_path"], wind, it_num)
-        #is_first_iter = false
+        is_first_iter = false
     end
 end
 
