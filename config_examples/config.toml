@@ -24,6 +24,7 @@ n_r = 50
 n_z = 51
 n_r_disk = 501 
 n_phi_disk = 251
+n_vacuum = 1e2
 log_spaced = false 
 tree_initial_divisions = 2
 
@@ -47,7 +48,6 @@ final_radius = 2000.0
 number_streamlines = 60
 iterations = 2
 log_spaced = false
-n_vacuum = 1e2
 wind_temperature = "disk"
 initial_conditions = "manual"
 n_0 = 1e10

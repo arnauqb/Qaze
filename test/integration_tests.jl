@@ -9,7 +9,7 @@
                 for phi in phi_d_range
                    # println("$r_d, $phi, $r, $z")
                     delta = sqrt(r^2 + z^2 + r_d^2 - 2 * r * r_d * cos(phi))
-                    tau = delta * SIGMA_T * wind.config["wind"]["n_vacuum"] * wind.bh.R_g
+                    tau = delta * SIGMA_T * wind.grids.n_vacuum * wind.bh.R_g
                     #@test tau_uv_disk_blob(wind, r_d, phi, r, z) ≈ tau atol=0 rtol=1e-2
                     @test tau_uv_disk_blob(r_d, phi, r, z, wind) ≈ tau atol=0 rtol=1e-2
                 end
@@ -17,7 +17,7 @@
         end
     end
     #deltas = sqrt.(r_range.^2 + r_d_range.^2 + z_range.^2 - 2 .* r_range .* r_d_range .* cos.(phi_d_range))
-    #taus = deltas .* SIGMA_T .* wind.config["wind"]["n_vacuum"] .* wind.bh.R_g
+    #taus = deltas .* SIGMA_T .* wind.grids.n_vacuum .* wind.bh.R_g
     #f(r_d, phi_d, r, z) = tau_uv_disk_blob(wind, r_d, phi_d, r, z)
     #@test all(isapprox.(f.(r_d_range, phi_d_range, r_range, z_range), taus, atol=0, rtol=1e-3))
 
@@ -57,9 +57,9 @@ end
     wind.grids.density .= 1e20
     integrate_kernel(v, 100, 1, 200, 50, wind) 
     @test all(v .< [1e-11,1e-11])
-    wind.grids.density .= wind.config["wind"]["n_vacuum"]
+    wind.grids.density .= wind.grids.n_vacuum
     wind.grids.density .= 1e10
     integrate_kernel(v, 100, 1, 200, 50, wind) 
     @test all(v .< [1e-11,1e-11])
-    wind.grids.density .= wind.config["wind"]["n_vacuum"]
+    wind.grids.density .= wind.grids.n_vacuum
 end

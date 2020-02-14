@@ -4,7 +4,8 @@ using StaticArrays: SVector
 using RegionTrees
 export compute_cell_intersection, compute_cell_size, fill_linewidth, fill_point, 
 fill_all_lines, copy, refine_all, refine_leaf, compute_density_grid, 
-plot_density_grid_tree, plot_tricontour, plot_taux_grid_tree, fill_line, refine_line, fill_and_refine, fill_and_refine_linewidth
+plot_density_grid_tree, plot_tricontour, plot_taux_grid_tree, fill_line, 
+fill_and_refine, fill_and_refine_linewidth, fill_and_refine_line, fill_and_refine_all_lines, erase_line_from_tree
 using PyPlot
 LogNorm = matplotlib.colors.LogNorm
 
@@ -26,6 +27,14 @@ end
 
 function ==(cell1::Cell, cell2::Cell)
     return cell1.boundary == cell2.boundary
+end
+
+function reinitialize_tree(wind::WindStruct)
+    quadtree_max_radius = wind.config["grids"]["r_max"]
+    quadtree_max_height = wind.config["grids"]["z_max"]
+    n_vacuum = wind.grids.n_vacuum
+    delta_tau_0 = n_vacuum * sqrt(quadtree_max_height^2 + quadtree_max_radius^2) * wind.bh.R_g * SIGMA_T
+    wind.quadtree = Cell(SVector(0., 0.), SVector(2 * quadtree_max_radius, 2* quadtree_max_height), [n_vacuum, 0., delta_tau_0])
 end
 
 function compute_cell_intersection(current_point, cell::Cell, initial_point, final_point)
@@ -144,7 +153,7 @@ end
 function fill_all_lines(wind::WindStruct)
     #initialize them all
     for leaf in allleaves(wind.quadtree)
-        leaf.data = [wind.config["wind"]["n_vacuum"], 0., 0.01]
+        leaf.data = [wind.grids.n_vacuum, 0., 0.01]
     end
     k=1
     for line in wind.lines
@@ -239,6 +248,27 @@ function fill_and_refine(point1, point2, linewidth_normalized, n, fm, wind::Wind
         currentleaf = findleaf(wind.quadtree, currentpoint)
         point2leaf = findleaf(wind.quadtree, point2)
         previousleaf = copy(currentleaf) 
+    end
+end
+
+function fill_and_refine_line(line, wind::WindStruct)
+    for i in 1:length(line.p.n_hist)-1
+        point1 = line.p.u_hist[i, 1:2]
+        point2 = line.p.u_hist[i+1, 1:2]
+        linewidth_normalized = line.p.line_width / line.p.r_0
+        n = line.p.n_hist[i]
+        fm = line.p.fm_hist[i]
+        fill_and_refine(point1, point2, linewidth_normalized, n, fm, wind)
+    end
+end
+
+function fill_and_refine_all_lines(wind::WindStruct)
+    for i in 1:length(wind.lines)
+        if !isassigned(wind.lines, i)
+            continue
+        end
+        line = wind.lines[i]
+        fill_and_refine_line(line)
     end
 end
 
@@ -338,6 +368,12 @@ function plot_tricontour(wind::WindStruct)
 end
 
 function erase_line_from_tree(line_id, wind::WindStruct)
+    println("resetting tree...")
+    reinitialize_tree(wind)
     line = wind.lines[line_id]
-    n_
+    n_vacuum = wind.grids.n_vacuum
+    line.n_hist .= n_vacuum * ones(Float64, size(line.n_hist))
+    line.fm_hist .= zeros(Float64, size(line.fm_hist))
+    println("refilling and refining all lines...")
+    fill_and_refine_all_lines(wind)
 end

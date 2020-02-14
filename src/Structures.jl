@@ -7,6 +7,10 @@ struct GridsStruct
     n_z::Int64
     n_disk::Int64
     n_lines::Int64
+    r_min::Float64
+    r_max::Float64
+    z_min::Float64
+    z_max::Float64
     r_range::Array{Float64,1}
     z_range::Array{Float64,1}
     d_max::Float64
@@ -19,6 +23,7 @@ struct GridsStruct
     fm_lines::Array{Float64, 3}
     mdot::Array{Float64,1}
     uv_fractions::Array{Float64,1}
+    n_vacuum::Float64
 end
 
 struct BlackHoleStruct

@@ -13,6 +13,7 @@ function initialize_grids(config::Dict, qsosed)
     z_min = config["grids"]["z_min"]
     r_max = config["grids"]["r_max"]
     z_max = config["grids"]["z_max"]
+    n_vacuum = config["grids"]["n_vacuum"]
     n_lines = config["wind"]["number_streamlines"]
     if config["grids"]["log_spaced"]
         r_range = logrange(r_min, r_max, n_r)
@@ -27,6 +28,10 @@ function initialize_grids(config::Dict, qsosed)
         n_z,
         n_disk,
         n_lines,
+        r_min,
+        r_max,
+        z_min,
+        z_max,
         r_range,
         z_range,
         sqrt(r_max^2 + z_max^2), # d_max
@@ -39,6 +44,7 @@ function initialize_grids(config::Dict, qsosed)
         zeros(Float64, n_lines, n_r, n_z), # fm lines
         config["bh"]["mdot"].* ones(Float64, n_disk), #mdot
         ones(Float64, n_disk), #uv fraction
+        n_vacuum,
     )
     return grids
 end
@@ -152,7 +158,7 @@ function refine_density_grid(wind::WindStruct)
         z_range_new,
         sqrt(wind.grids.r_range[end]^2 + wind.grids.z_range[end]^2), # d_max
         wind.grids.disk_range,
-        wind.config["wind"]["n_vacuum"] * ones(Float64, newsize_r, newsize_z), #density
+        wind.grids.n_vacuum * ones(Float64, newsize_r, newsize_z), #density
         zeros(Float64, wind.grids.n_lines, newsize_r, newsize_z), # density lines
         zeros(Float64, newsize_r, newsize_z), #tau_x
         zeros(Float64, newsize_r, newsize_z), #ionization

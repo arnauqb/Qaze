@@ -81,7 +81,7 @@ function initialize_json(json_file, wind::WindStruct)
 
     data["metadata"]["f_uv"] = wind.radiation.f_uv
     data["metadata"]["f_x"] = wind.radiation.f_x
-    data["metadata"]["n_vacuum"] = wind.config["wind"]["n_vacuum"]
+    data["metadata"]["n_vacuum"] = wind.grids.n_vacuum
     data["metadata"]["r_in"] = wind.config["wind"]["initial_radius"]
     data["metadata"]["r_out"] = wind.config["wind"]["final_radius"]
     for it in 1:wind.config["wind"]["iterations"]
