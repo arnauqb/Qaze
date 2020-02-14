@@ -173,7 +173,7 @@ function refine_leaf(currentpoint, leaf, n, fm, wind)
     while !optically_thin
         optically_thin = true
         maxz = vertices(leaf.boundary)[2,2][2]
-        refine_condition = (leaf.data[3] > 0.1) && (maxz > wind.config["wind"]["z_0"]) 
+        refine_condition = (leaf.data[3] > 0.1) && (maxz > wind.z_0) 
         if refine_condition
             optically_thin = false
             split!(leaf, split_cell_initialization)
@@ -280,7 +280,7 @@ function refine_all(wind::WindStruct)
         optically_thin = true
         for leaf in allleaves(wind.quadtree)
             maxz = vertices(leaf.boundary)[2,2][2]
-            refine_condition = (leaf.data[3] > 0.1) && (maxz > wind.config["wind"]["z_0"]) 
+            refine_condition = (leaf.data[3] > 0.1) && (maxz > wind.z_0) 
             if refine_condition
                 optically_thin = false
                 split!(leaf)
@@ -310,7 +310,7 @@ function plot_taux_grid_tree(wind::WindStruct)
     nz = 51
     grid = zeros(Float64, nr, nz)
     r_range = range(wind.grids.r_range[1], stop=wind.grids.r_range[end], length=nr)
-    z_range = range(wind.config["wind"]["z_0"], stop=wind.grids.z_range[end], length=nz)
+    z_range = range(wind.z_0, stop=wind.grids.z_range[end], length=nz)
     for (i, r) in enumerate(r_range)
         for (j, z) in enumerate(z_range)
             taux = compute_taux_tree(r, z, wind)
@@ -328,7 +328,7 @@ function plot_density_grid_tree(wind::WindStruct)
     nz = 501
     grid = zeros(Float64, nr, nz)
     r_range = range(wind.grids.r_range[1], stop=wind.grids.r_range[end], length=nr)
-    z_range = range(wind.config["wind"]["z_0"], stop=wind.grids.z_range[end], length=nz)
+    z_range = range(wind.z_0, stop=wind.grids.z_range[end], length=nz)
     for (i, r) in enumerate(r_range)
         for (j, z) in enumerate(z_range)
             leaf = findleaf(wind.quadtree, [r,z])

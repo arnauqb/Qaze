@@ -147,4 +147,5 @@ function write_properties_and_grids(json_file, wind::WindStruct, it_num)
         data[@sprintf("it_%02d", it_num)]["grids"] = grids 
         JSON.print(f,data)
     end
+    return nothing
 end

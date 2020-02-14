@@ -59,6 +59,7 @@ mutable struct WindStruct
     lines_initial_radius::Float64
     lines_range::Array{Float64,1}
     lines_widths::Array{Float64,1}
+    z_0::Float64
 end
 
 mutable struct StreamlineStruct

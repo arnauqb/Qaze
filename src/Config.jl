@@ -54,13 +54,8 @@ function initialize(config::Dict)
     quadtree_max_height = config["grids"]["z_max"]
     delta_tau_0 = grids.n_vacuum * sqrt(quadtree_max_height^2 + quadtree_max_radius^2) * R_g * SIGMA_T
     quadtree = Cell(SVector(0., 0.), SVector(2 * quadtree_max_radius, 2* quadtree_max_height), [grids.n_vacuum, 0., delta_tau_0])
-    #split!(quadtree)
-    #for i in 1:config["grids"]["tree_initial_divisions"] - 1
-    #    for leaf in allleaves(quadtree)
-    #        split!(leaf)
-    #    end
-    #end
-    wind = WindStruct(config, bh, sed, grids, quadtree, rad, lines, lines_initial_radius, lines_range, lines_widths)
+    z_0 = config["wind"]["z_0"]
+    wind = WindStruct(config, bh, sed, grids, quadtree, rad, lines, lines_initial_radius, lines_range, lines_widths, z_0)
     initialize_uv_fraction(wind)
     initialize_json(config["general"]["save_path"], wind)
     return wind

@@ -175,7 +175,7 @@ end
 
 function compute_taux_leaf(point, intersection, leaf, wind::WindStruct)
     deltad = distance2d(point, intersection) * wind.bh.R_g
-    d = distance2d([0.,wind.config["wind"]["z_0"]], point) * wind.bh.R_g
+    d = distance2d([0.,wind.z_0], point) * wind.bh.R_g
     density = leaf.data[1]
     xi0 = wind.radiation.xray_luminosity / (density * d^2)
     taux = 0.
@@ -190,10 +190,10 @@ function compute_taux_leaf(point, intersection, leaf, wind::WindStruct)
 end
 
 function compute_tau_x(r, z, wind::WindStruct ; return_coords = false)
-    z = max(z, wind.config["wind"]["z_0"])
+    z = max(z, wind.z_0)
     @assert z >= 0
     #r = max(r,0.)
-    point1 = [0.0, wind.config["wind"]["z_0"]]
+    point1 = [0.0, wind.z_0]
     coords_list = [point1]
     point1leaf = findleaf(wind.quadtree, point1)
     point2 = [r,z]

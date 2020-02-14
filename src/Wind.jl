@@ -15,7 +15,7 @@ function initialize_line(i, r, wind::WindStruct)
     if n_0 == "cak"
         n_0 = cak_density(r, wind)
     end
-    z_0 = wind.config["wind"]["z_0"]
+    z_0 = wind.z_0
     line_integ = initialize_line(i, r, z_0, v_0, n_0, v_th, wind)
     return line_integ
 end
@@ -25,6 +25,7 @@ function start_line(line_id, r_0, wind::WindStruct)
     wind.lines[line_id] = line
     @printf("\nSolving line %02d of %02d ", line_id, length(wind.lines))
     solve!(line)
+    flush(stdout)
     return line
 end
 
