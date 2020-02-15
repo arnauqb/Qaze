@@ -1,14 +1,14 @@
 export gravity, SS_temperature, gravity_cgs, eddington_luminosity, bolometric_luminosity, mass_accretion_rate
+
+"Gravitational force in units of c^2/R_g"
 function gravity(r, z, bh::BlackHoleStruct)
-    #=
-    Gravitational force in units of Rg/c^2
-    =#
     d = sqrt(r^2 + z^2)
     constant = -1. / d^2
     result = constant * [r / d, abs(z) / d]
     return result
 end
 
+"Accretion disc temperature profile following Shakura & Sunyaev model."
 function SS_temperature(r, bh::BlackHoleStruct)
     a = 3 * G * bh.M * M_SUN * mass_accretion_rate(bh)
     b = 8 * pi * (r * bh.R_g)^3 * SIGMA_SB
@@ -16,6 +16,7 @@ function SS_temperature(r, bh::BlackHoleStruct)
     return T
 end
 
+"Gravitational force in cgs units."
 function gravity_cgs(r, z, bh::BlackHoleStruct)
     return gravity(r,z,bh) *  C^2 / bh.R_g
 end

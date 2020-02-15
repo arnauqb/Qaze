@@ -3,7 +3,7 @@ using Printf
 export initialize_line, start_lines, compute_line_mdot, compute_wind_mdot,
        compute_kinetic_luminosity, compute_maximum_velocity, start_lines_animation, start_iteration, start_line
 
-function initialize_line(i, r, wind::WindStruct)
+function initialize_line!(i, r, wind::WindStruct)
     T = wind.sed.disk_nt_temperature4(r)^(0.25)
     v_th = thermal_velocity(T)
     if wind.config["wind"]["v_0"] == "thermal"
@@ -20,8 +20,8 @@ function initialize_line(i, r, wind::WindStruct)
     return line_integ
 end
 
-function start_line(line_id, r_0, wind::WindStruct)
-    line = initialize_line(line_id, r_0, wind)
+function start_line!(line_id, r_0, wind::WindStruct)
+    line = initialize_line!(line_id, r_0, wind)
     wind.lines[line_id] = line
     @printf("\nSolving line %02d of %02d ", line_id, length(wind.lines))
     flush(stdout)
@@ -30,12 +30,12 @@ function start_line(line_id, r_0, wind::WindStruct)
     return line
 end
 
-function start_iteration(it_num, wind::WindStruct)
+function start_iteration!(it_num, wind::WindStruct)
     for (i, r_0) in enumerate(wind.lines_range)
         if it_num > 1
-            erase_line_from_tree(i, wind)
+            erase_line_from_tree!(i, wind)
         end
-        line = start_line(i, r_0, wind)
+        line = start_line!(i, r_0, wind)
         write_line(wind.config["general"]["save_path"], line.p, it_num)
     end
 end
@@ -43,45 +43,16 @@ end
 function start_lines(wind::WindStruct)
     wind.radiation.include_tauuv = false
     for it_num in 1:wind.config["wind"]["iterations"]
+        @printf("Iteration %02d of %02d\n", it_num, wind.config["wind"]["iterations"])
+        flush(stdout)
         if it_num > 1
-            update_mdot_grid(wind)
+            update_mdot_grid!(wind)
             wind.radiation.include_tauuv = true
         end
-        start_iteration(it_num, wind)
-        refine_all(wind)
+        start_iteration!(it_num, wind)
+        #refine_all(wind)
         write_properties_and_grids(wind.config["general"]["save_path"], wind, it_num)
     end
-end
-
-function start_lines_animation(wind::WindStruct)
-    is_first_iter = true
-    xi_grids = []
-    density_grids = []
-    for it_num in 1:wind.config["wind"]["iterations"]
-        wind.grids.density_lines[:,:,:] .= 0.
-        wind.grids.density[:,:] .= wind.grids.n_vacuum
-        wind.grids.fm_lines[:,:,:] .= 0.
-        wind.grids.fm[:,:] .= 0.
-        if it_num >= 3
-            update_mdot_grid(wind)
-        end
-        for (i, r) in enumerate(wind.lines_range)
-            if !is_first_iter
-                erase_line_from_grid(i, wind)
-            end
-            line = initialize_line(i, r, wind)
-            wind.lines[i] = line
-            print("\nSolving line $i of $(length(wind.lines))")
-            solve!(line)
-            write_line(wind.config["general"]["save_path"], line.p, it_num)
-            update_taux_and_xi_grid(wind)
-            push!(xi_grids, copy(wind.grids.ionization))
-            push!(density_grids, copy(wind.grids.density))
-        end
-        write_properties_and_grids(wind.config["general"]["save_path"], wind, it_num)
-        is_first_iter = false
-    end
-    return density_grids, xi_grids
 end
 
 function compute_line_mdot(line, wind::WindStruct)

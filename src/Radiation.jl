@@ -1,12 +1,28 @@
-export thermal_velocity, eddington_luminosity, initialize_uv_fraction, nt_rel_factors, opacity_x, compute_taux_grid, ionization_parameter,
-       compute_tau_eff, force_multiplier, force_radiation, compute_taux_leaf, compute_tau_x
+export thermal_velocity,
+       eddington_luminosity,
+       initialize_uv_fraction!,
+       update_mdot_grid!,
+       nt_rel_factors,
+       opacity_x,
+       compute_taux_leaf,
+       compute_tau_x,
+       ionization_parameter,
+       compute_tau_eff,
+       force_multiplier,
+       force_radiation
 
 function thermal_velocity(T, mu = 1.)
     v = sqrt(K_B * T / (mu * M_P)) / C
     return v
 end
 
-function initialize_uv_fraction(wind::WindStruct)
+"""
+Computes the radial fraction of UV flux. 
+If the flag disk_uv_fraction is on, then the fraction is computed using the QSOSED model
+in Kubota and Done 2018.
+Otherwise, the fraction is constant throughout radius equal to f_uv
+"""
+function initialize_uv_fraction!(wind::WindStruct)
     if wind.config["radiation"]["disk_uv_fraction"]
         wind.grids.disk_range[:], wind.grids.uv_fractions[:] = wind.sed.compute_uv_fractions(
             inner_radius=wind.bh.disk_r_min,
@@ -20,6 +36,33 @@ function initialize_uv_fraction(wind::WindStruct)
     end
 end
 
+"""
+Updates the radial dependent mass accretion rate to take into account the wind mass loss
+self consistently. Initially it's initialized at a constant value of Mdot.
+"""
+function update_mdot_grid!(wind::WindStruct)
+    accumulated_wind = 0.
+    for line in reverse(wind.lines)
+        r_0 = line.p.r_0
+        width = line.p.line_width
+        rmin_arg = get_index(wind.grids.disk_range, r_0 - width/2.)
+        rmax_arg = get_index(wind.grids.disk_range, r_0 + width/2.)
+        mw = compute_line_mdot(line, wind)
+        mw_norm = mw / mass_accretion_rate(wind.bh)
+        accumulated_wind += mw_norm
+        mdot = wind.bh.mdot - accumulated_wind
+        wind.grids.mdot[rmin_arg:rmax_arg] .= max(mdot , 0.)
+    end
+    rmin = wind.lines_initial_radius 
+    rmin_arg = get_index(wind.grids.disk_range, rmin )
+    wind.grids.mdot[1:rmin_arg] .= max(wind.bh.mdot - accumulated_wind, 0.)
+    return wind.grids.mdot
+end
+
+"""
+Novikov-Thorne relativistic factors for the AD spectrum.
+If the passed radius is smaller than ISCO, it returns 0.
+"""
 function nt_rel_factors(r, astar, isco)
     if r <= isco
         return 0.
@@ -38,6 +81,7 @@ function nt_rel_factors(r, astar, isco)
     return factor
 end
 
+"Simple X-Ray opacity as a function of ionization parameter xi"
 function opacity_x(xi)
     if xi <= 1e5
         return 100
@@ -46,156 +90,35 @@ function opacity_x(xi)
     end
 end
 
-function compute_tau_x_old(r, z, wind::WindStruct)
-    r_arg = get_index(wind.grids.r_range, r)
-    z_arg = get_index(wind.grids.z_range, z)
-    line_coords = drawline(1,1, r_arg, z_arg)
-    println("r: $r, z: $z")
-    println(line_coords)
-    tau = 0.
-    tau_length = size(line_coords)[1]
-    #println("r: $r, z: $z")
-    #println(line_coords)
-    for k in 1:(tau_length-1)
-        row = line_coords[k,:]
-        i, j = row
-        rp1 = wind.grids.r_range[i]
-        rp2 = wind.grids.r_range[min(i+1, wind.grids.n_r)]
-        zp1 = wind.grids.z_range[j]
-        zp2 = wind.grids.z_range[min(j+1, wind.grids.n_z)]
-        println("rp1: $rp1 rp2: $rp2, zp1: $zp1, zp2: $zp2")
-        d2 = sqrt(rp2^2 + zp2^2) * wind.bh.R_g
-        delta_d = sqrt((rp2-rp1)^2 + (zp2-zp1)^2) * wind.bh.R_g
-        density = wind.grids.density[i,j]
-        #println("r: $rp z :$zp den: $density")
-        xi0 = wind.radiation.xray_luminosity / (density * d2^2)
-        xi = xi0
-        for dummy in 1:2
-            dtau = density * opacity_x(xi) * delta_d * SIGMA_T
-            tau_prov = tau + dtau
-            xi = xi0 * exp(-tau_prov)
-        end
-        println(delta_d / wind.bh.R_g)
-        tau = tau + density * opacity_x(xi) * delta_d * SIGMA_T
-    end
-    #d = sqrt(r^2 + z^2) * wind.bh.R_g
-    @assert tau >= 0
-    return tau
-end
-
-function compute_taux_grid(r, z, wind::WindStruct)
-    if r <= wind.grids.r_range[1] || z < 0
-        return 0.
-    end
-    r1 = 0.
-    z1 = 0.
-    r_arg = get_index(wind.grids.r_range, r)
-    z_arg = get_index(wind.grids.z_range, z)
-    m = z / r 
-    deltad = 0.
-    r2 = wind.grids.r_range[1]
-    z2 = m * r2
-    tau = sqrt(r2^2 + z2^2) * wind.bh.R_g * SIGMA_T * wind.grids.n_vacuum
-    rp_arg = 1
-    zp_arg = get_index(wind.grids.z_range, z2)
-    lambda_r = 0.
-    lambda_z = 0.
-    max_steps = max(abs(r_arg - 1), abs(z_arg - 1))
-    delta_d_total = sqrt(r2^2 + z2^2) * wind.bh.R_g
-    counter = 1
-    #while ((rp_arg < r_arg) || (zp_arg < z_arg))
-    while(true)
-        if counter >= max_steps
-            break
-        end
-        r1 = r2
-        z1 = z2
-        density = wind.grids.density[rp_arg, zp_arg]
-        try
-            r2_candidate = wind.grids.r_range[rp_arg + 1]
-            lambda_r = (r2_candidate - r1) / r
-        catch
-            lambda_r = Inf32
-            nothing
-        end
-        try
-            z2_candidate = wind.grids.z_range[zp_arg + 1]
-            lambda_z = (z2_candidate - z1) / z
-        catch
-            lambda_z = Inf32
-        end
-        if lambda_r < lambda_z
-            rp_arg += 1
-            r2 = wind.grids.r_range[rp_arg]
-            z2 = m * r2 
-        elseif lambda_r == lambda_z
-            rp_arg += 1
-            zp_arg += 1
-            r2 = wind.grids.r_range[rp_arg]
-            z2 = wind.grids.z_range[zp_arg]
-            counter += 1
-        elseif lambda_r > lambda_z
-            zp_arg += 1
-            z2 = wind.grids.z_range[zp_arg]
-            r2 = z2 / m
-        end
-        deltad = sqrt((r2-r1)^2 + (z2-z1)^2) * wind.bh.R_g
-        delta_d_total += deltad
-        d2 = (r2^2 + z2^2) * wind.bh.R_g^2
-        xi0 = wind.radiation.xray_luminosity / (density * d2)
-        xi = xi0
-        for dummy in 1:2
-            dtau = density * opacity_x(xi) * deltad * SIGMA_T
-            tau_prov = tau + dtau
-            xi = xi0 * exp(-tau_prov)
-        end
-        tau += density * SIGMA_T * deltad * opacity_x(xi)
-        counter += 1
-    end
-    # add last bit
-    density = wind.grids.density[r_arg, z_arg]
-    deltad = sqrt((r-r2)^2 + (z-z2)^2) * wind.bh.R_g
-    delta_d_total += deltad
-    d2 = (r^2 + z^2) * wind.bh.R_g^2
-    try
-        @assert isapprox(delta_d_total, sqrt(d2), atol=0, rtol=5e-1)
-    catch
-        println("distances do not match!")
-        println("r : $r z : $z")
-        println("deltad_total: $(delta_d_total/wind.bh.R_g) d2 : $(sqrt(d2)/wind.bh.R_g)")
-        @assert isapprox(delta_d_total, sqrt(d2), atol=0, rtol=1e-2)
-    end
-    xi0 = wind.radiation.xray_luminosity / (density * d2)
-    xi = xi0
-    for dummy in 1:2
-        dtau = density * opacity_x(xi) * deltad * SIGMA_T
-        tau_prov = tau + dtau
-        xi = xi0 * exp(-tau_prov)
-    end
-    tau += density * SIGMA_T * deltad * opacity_x(xi)
-    return tau
-end
-
+"""
+Computes the variation of optical depth inside a tree leaf.
+We iterate multiple times to compute a consistent ionization parameter
+and X-Ray optical depth
+"""
 function compute_taux_leaf(point, intersection, leaf, wind::WindStruct)
-    deltad = distance2d(point, intersection) * wind.bh.R_g
-    d = distance2d([0.,wind.z_0], point) * wind.bh.R_g
+    deltad = distance2d(point, intersection) * wind.bh.R_g # cell size
+    d = distance2d([0.,wind.z_0], point) * wind.bh.R_g # distance from the center
     density = leaf.data[1]
     xi0 = wind.radiation.xray_luminosity / (density * d^2)
     taux = 0.
     xi = xi0
-    for i = 1:2
+    for i = 1:2 
         taux = density * opacity_x(xi) * deltad * SIGMA_T
         xi = xi0 * exp(-taux)
     end
-    #println("point :$point, den : $density")
     taux = density * opacity_x(xi) * deltad * SIGMA_T
     return taux
 end
 
+"""
+Computes the X-Ray optical depth at a point (r,z).
+Starting from the center, we compute the intersection to the next cell,
+following the lightray direction (0,0) -> (r,z). At each cell,
+we consistently compute tau_x and the ionization parameter.
+"""
 function compute_tau_x(r, z, wind::WindStruct ; return_coords = false)
     z = max(z, wind.z_0)
     @assert z >= 0
-    #r = max(r,0.)
     point1 = [0.0, wind.z_0]
     coords_list = [point1]
     point1leaf = findleaf(wind.quadtree, point1)
@@ -215,7 +138,6 @@ function compute_tau_x(r, z, wind::WindStruct ; return_coords = false)
         intersection = compute_cell_intersection(currentpoint, currentleaf, point1, point2)
         push!(coords_list, intersection)
         taux += compute_taux_leaf(currentpoint, intersection, currentleaf, wind)
-        #println("r : $r,z : $z")
         currentpoint = intersection
         currentleaf = findleaf(wind.quadtree, currentpoint)
     end
@@ -228,6 +150,7 @@ function compute_tau_x(r, z, wind::WindStruct ; return_coords = false)
     end
 end
 
+"Computes the ionization parameter at a point (r,z)"
 function ionization_parameter(r, z, density, tau_x, wind::WindStruct)
     d2 = (r^2 + z^2) * wind.bh.R_g^2
     xi = wind.radiation.xray_luminosity * exp(-tau_x) / (density * d2) + 1e-20
@@ -235,6 +158,7 @@ function ionization_parameter(r, z, density, tau_x, wind::WindStruct)
     return xi
 end
 
+"This is the sobolev optical depth parameter for the force multiplier"
 function compute_tau_eff(density, dv_dr, v_th)
     if dv_dr == 0
         return 1.
@@ -244,11 +168,13 @@ function compute_tau_eff(density, dv_dr, v_th)
     return t
 end
 
+"Fitting parameter for the fm"
 function force_multiplier_k(xi)
     k = 0.03 + 0.385 * exp(-1.4 * xi^0.6)
     return k
 end
 
+"Fitting parameter for the fm"
 function force_multiplier_eta(xi)
     if (log10(xi) < 0.5)
         aux = 6.9 * exp(0.16 * xi^0.4)
@@ -259,6 +185,11 @@ function force_multiplier_eta(xi)
     end
 end
 
+"""
+Computes the analytical approximation for the force multiplier,
+from Stevens and Kallman 1990. Note that we modify it slightly to avoid
+numerical overflow.
+"""
 function force_multiplier(t, xi)
     @assert t>= 0
     @assert xi>= 0
@@ -277,6 +208,11 @@ function force_multiplier(t, xi)
     return fm
 end
 
+"""
+Computes the radiation force at a point (r,z) opacity (1+fm)sigma_t.
+the option include_tau_uv decides wheter to consider the attenuation
+of the UV flux along the disc annuli-gas patch los.
+"""
 function force_radiation(r, z, fm, wind::WindStruct ; include_tau_uv = false)
     @assert r >= 0
     @assert z >= 0

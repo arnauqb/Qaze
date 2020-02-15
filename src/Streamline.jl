@@ -4,6 +4,9 @@ using Sundials
 using Statistics
 using RegionTrees
 
+
+"Updates the density of the streamline giving its current position and velocity,
+using mass conservation."
 function compute_density(r, z, v_T, line::StreamlineStruct)
     @assert r >= 0
     @assert z >= 0
@@ -14,19 +17,38 @@ function compute_density(r, z, v_T, line::StreamlineStruct)
     return n
 end
 
+"Initializes the IDA solver given the initial conditions"
 function initialize_line(line_id, r_0, z_0, v_0, n_0, v_th, wind::WindStruct)
-    v_phi_0 = sqrt(1. / r_0)
-    l = v_phi_0 * r_0
+    v_phi_0 = sqrt(1. / r_0) # initial kepler velocity
+    l = v_phi_0 * r_0 # initial angular momentum
     lw0 = wind.lines_widths[line_id]
     linewidth_normalized = lw0 / r_0
-    fill_and_refine([r_0, z_0], [r_0, z_0], linewidth_normalized, n_0, 0., wind)
+    fill_and_refine!([r_0, z_0], [r_0, z_0], linewidth_normalized, n_0, 0., wind) # fill first point
     a_r_0, a_z_0, fm, xi, dv_dr, tau_x = compute_initial_acceleration(r_0, z_0, v_0, n_0, v_th, l, wind)
     u0 = [r_0, z_0, 0., v_0]
     du0 = [0., v_0, a_r_0, a_z_0]
     u_hist = reshape(u0, (1,4))
-    line = StreamlineStruct(wind, line_id, r_0, z_0, v_0, v_phi_0, n_0,
-                            v_th, l, lw0, false, false, 0, u_hist,
-                            [n_0], [tau_x], [fm], [xi], [dv_dr], [a_r_0], [a_z_0])
+    line = StreamlineStruct(wind,
+                            line_id,
+                            r_0,
+                            z_0,
+                            v_0,
+                            v_phi_0,
+                            n_0,
+                            v_th,
+                            l,
+                            lw0,
+                            false,
+                            false,
+                            0,
+                            u_hist,
+                            [n_0],
+                            [tau_x],
+                            [fm],
+                            [xi],
+                            [dv_dr],
+                            [a_r_0],
+                            [a_z_0])
     tspan = (0., 1e8)
     termination_cb = DiscreteCallback(condition, affect, save_positions=(false, false))
     saved_values_type = SavedValues(Float64, Array{Float64,1})
@@ -44,6 +66,7 @@ function solve_line!(line)
     solve!(line)
 end
 
+"Computes the initial acceleration, consistently with the current values of the ionization parameter."
 function compute_initial_acceleration(r_0, z_0, v_0, n_0, v_th, l, wind::WindStruct)
     fg = gravity(r_0, z_0, wind.bh)
     tau_x = compute_tau_x(r_0, z_0, wind)
@@ -64,11 +87,11 @@ function compute_initial_acceleration(r_0, z_0, v_0, n_0, v_th, l, wind::WindStr
     return [a_r, a_z, fm, xi, dv_dr, tau_x]
 end
 
+"Residual function of the implict diffeq system"
 function residual!(resid, du, u, line, t)
     r, z, v_r, v_z = u
     r_dot, z_dot, v_r_dot, v_z_dot = du
-    if r < 0 || z < 0
-        #println("warning, out of domain")
+    if r < 0 || z < 0 # if integrator tries outside domain, switch off radiation
         fg = gravity(r, z, line.wind.bh)
         centrifugal_term = line.l^2 / r^3
         a_r = fg[1] + centrifugal_term
@@ -98,15 +121,14 @@ function residual!(resid, du, u, line, t)
     resid[4] = v_z_dot - a_z
 end
 
+"Termination condition"
 function condition(u, t, integrator)
     r, z, v_r, v_z = u
     _, _, a_r, a_z = integrator.du
     d = sqrt(r^2 + z^2)
     v_T = sqrt(v_r^2 + v_z^2)
     v_esc = sqrt(2. / d)
-    if v_T > v_esc
-        integrator.p.escaped = true
-    end
+    v_T > v_esc && (integrator.p.escaped=true)
     crossing_condition = false
     #if r < integrator.p.r_0
     #    integrator.p.crossing_counter += 1
@@ -123,10 +145,8 @@ function condition(u, t, integrator)
     #        stalling_condition = true
     #    end
     #end
-    escaped_condition = (r >= integrator.p.wind.grids.r_range[end]) || (z >= integrator.p.wind.grids.z_range[end])
-    if escaped_condition
-        integrator.p.outofdomain = true
-    end
+    escaped_condition = (r >= integrator.p.wind.grids.r_max) || (z >= integrator.p.wind.grids.z_max)
+    escaped_condition && (integrator.p.outofdomain=true)
     failed_condtion = z < integrator.p.z_0  || r < 0.
     cond = escaped_condition | failed_condtion | crossing_condition 
     return cond
@@ -143,6 +163,7 @@ function affect(integrator)
     terminate!(integrator)
 end
 
+"Saves current iteration data"
 function save(u, t, integrator)
     r, z, v_r, v_z = u
     if any([r,z] .< 0)
@@ -160,19 +181,10 @@ function save(u, t, integrator)
     tau_eff = compute_tau_eff(n, dv_dr, integrator.p.v_th)
     fm = force_multiplier(tau_eff, xi)
     r_0, z_0, v_r_0, v_z_0 = integrator.p.u_hist[end,:]
-    #lw = integrator.p.line_width / integrator.p.r_0 * r
     linewidth_normalized = integrator.p.line_width / integrator.p.r_0 
-    #if integrator.p.wind.config["radiation"]["tau_uv_include_fm"]
-    #    update_density_and_fm_lines(r_0, r, z_0, z, lw, n, fm, integrator.p.line_id, integrator.p.wind)
-    #else
-    #    update_density_and_fm_lines(r_0, r, z_0, z, lw, n, 0., integrator.p.line_id, integrator.p.wind)
-    #end
     currentpoint = [r, z]
     previouspoint = [r_0, z_0]
-    #fill_point(currentpoint, previouspoint, linewidth_normalized, n, fm, integrator.p.wind)
-    #currentleaf = findleaf(integrator.p.wind.quadtree, [r,z])
-    #refine_line([r,z], currentleaf, integrator, integrator.p.wind)
-    fill_and_refine(previouspoint, currentpoint, linewidth_normalized, n, fm, integrator.p.wind)
+    fill_and_refine!(previouspoint, currentpoint, linewidth_normalized, n, fm, integrator.p.wind)
     integrator.p.u_hist = [integrator.p.u_hist ; transpose(u)]
     push!(integrator.p.fm_hist, fm)
     push!(integrator.p.n_hist, n)

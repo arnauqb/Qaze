@@ -67,17 +67,14 @@ function initialize_json(json_file, wind::WindStruct)
 
     data["metadata"]["disk_r_min"] = wind.config["disk"]["inner_radius"]
     data["metadata"]["disk_r_max"] = wind.config["disk"]["outer_radius"]
-
-    data["metadata"]["grid_r_min"] = wind.grids.r_range[1]
-    data["metadata"]["grid_z_min"] = wind.grids.z_range[1]
-    data["metadata"]["grid_r_max"] = wind.grids.r_range[end]
-    data["metadata"]["grid_z_max"] = wind.grids.z_range[end]
-    data["metadata"]["n_grid_r"] = wind.grids.n_r
-    data["metadata"]["n_grid_z"] = wind.grids.n_z
+    data["metadata"]["grid_r_min"] = wind.grids.r_min
+    data["metadata"]["grid_z_min"] = wind.grids.z_min
+    data["metadata"]["grid_r_max"] = wind.grids.r_max
+    data["metadata"]["grid_z_max"] = wind.grids.z_max
     data["metadata"]["n_grid_disk"] = wind.grids.n_disk
     data["metadata"]["n_lines"] = wind.grids.n_lines
-    data["metadata"]["r_range"] = wind.grids.r_range
-    data["metadata"]["z_range"] = wind.grids.z_range
+    #data["metadata"]["r_range"] = wind.grids.r_range
+    #data["metadata"]["z_range"] = wind.grids.z_range
 
     data["metadata"]["f_uv"] = wind.radiation.f_uv
     data["metadata"]["f_x"] = wind.radiation.f_x
@@ -88,7 +85,7 @@ function initialize_json(json_file, wind::WindStruct)
         data[@sprintf("it_%02d", it)] = Dict(
                 "lines" => [],
                 "lines_escaped" => [],
-                "grids" => Dict(),
+                #"grids" => Dict(),
                 "properties" => Dict()
         )
     end
@@ -119,6 +116,7 @@ function write_line(json_file, line::StreamlineStruct, it_num)
 end
 
 function write_properties_and_grids(json_file, wind::WindStruct, it_num)
+    print("saving data...")
     mdot_wind = compute_wind_mdot(wind)
     kin_lumin = compute_kinetic_luminosity(wind)
     properties = Dict(
@@ -128,24 +126,15 @@ function write_properties_and_grids(json_file, wind::WindStruct, it_num)
         "kin_lumin" => kin_lumin,
         "kin_lumin_norm" => kin_lumin / eddington_luminosity(wind.bh),
     )
-    println("\n updating tau_x and xi grid...")
-    #update_taux_and_xi_grid(wind)
-    #wind.grid.tau_x_grid.update_all()
-    #print("updating ionization grid...")
-    #wind.grid.ionization_grid.update_all()
-    grids = Dict(
-        "density" => wind.grids.density,
-        "force_multiplier" => wind.grids.fm,
-        "tau_x" => wind.grids.tau_x,
-        "ionization" => wind.grids.ionization,
-    )
     data = open(json_file, "r") do f
         data = JSON.parse(f)
     end
     open(json_file, "w") do f
         data[@sprintf("it_%02d", it_num)]["properties"] = properties
-        data[@sprintf("it_%02d", it_num)]["grids"] = grids 
+        #data[@sprintf("it_%02d", it_num)]["grids"] = grids 
         JSON.print(f,data)
     end
+    print("done \n")
+    flush(stdout)
     return nothing
 end

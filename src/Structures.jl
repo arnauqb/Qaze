@@ -3,24 +3,13 @@ using RegionTrees: AbstractRefinery, Cell
 export GridsStruct, BlackHoleStruct, RadiationStruct, StreamlineStruct, WindStruct, GridRefinery
 
 struct GridsStruct
-    n_r::Int64
-    n_z::Int64
     n_disk::Int64
     n_lines::Int64
     r_min::Float64
     r_max::Float64
     z_min::Float64
     z_max::Float64
-    r_range::Array{Float64,1}
-    z_range::Array{Float64,1}
-    d_max::Float64
     disk_range::Array{Float64,1}
-    density::Array{Float64,2}
-    density_lines::Array{Float64, 3}
-    tau_x::Array{Float64,2}
-    ionization::Array{Float64,2}
-    fm::Array{Float64,2}
-    fm_lines::Array{Float64, 3}
     mdot::Array{Float64,1}
     uv_fractions::Array{Float64,1}
     n_vacuum::Float64
@@ -45,7 +34,6 @@ mutable struct RadiationStruct
     xray_luminosity::Float64
     force_constant::Float64
     include_tauuv::Bool
-    include_fm_in_tauuv::Bool
 end
 
 mutable struct WindStruct

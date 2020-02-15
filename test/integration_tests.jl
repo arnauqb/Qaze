@@ -54,12 +54,12 @@ end
     integrate_kernel(v, 100, 1, 200, 50, wind) 
     @test all(isapprox.(v, 2*v_base, atol=0, rtol=1e-4))
     wind.grids.uv_fractions ./= 2
-    wind.grids.density .= 1e20
-    integrate_kernel(v, 100, 1, 200, 50, wind) 
-    @test all(v .< [1e-11,1e-11])
-    wind.grids.density .= wind.grids.n_vacuum
-    wind.grids.density .= 1e10
-    integrate_kernel(v, 100, 1, 200, 50, wind) 
-    @test all(v .< [1e-11,1e-11])
-    wind.grids.density .= wind.grids.n_vacuum
+    #wind.grids.density .= 1e20
+    #integrate_kernel(v, 100, 1, 200, 50, wind) 
+    #@test all(v .< [1e-11,1e-11])
+    #wind.grids.density .= wind.grids.n_vacuum
+    #wind.grids.density .= 1e10
+    #integrate_kernel(v, 100, 1, 200, 50, wind) 
+    #@test all(v .< [1e-11,1e-11])
+    #wind.grids.density .= wind.grids.n_vacuum
 end

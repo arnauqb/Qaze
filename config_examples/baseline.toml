@@ -1,7 +1,7 @@
 title = "Qwind config file"
 
 [general]
-save_path = "refin.json"
+save_path = "baseline.json"
 verbosity = 0
 
 [bh]
@@ -18,25 +18,24 @@ mu = 1.0
 [grids]
 r_min = 0.0
 z_min = 0.0
-r_max = 3000.0
-z_max = 3000.0
-n_r_disk = 501 
+r_max = 10000.0
+z_max = 10000.0
+n_r_disk = 1001
 n_vacuum = 1e2
-log_spaced = false 
 tree_initial_divisions = 2
 cell_optical_thickness = 0.1
 
 [radiation]
 f_uv = "auto" 
 f_x = "auto"
-non_adaptive_integral = false
-integral_rtol = 1e-3
+integral_rtol = 1e-2
 analytical_fm = true
 tau_uv_geometry = "disk"
 disk_uv_fraction = true 
 no_tau_uv = false
 no_tau_uv_z = false 
 tau_uv_include_fm = true
+constant_frad_height = 1.0
 
 [wind]
 initial_radius = "warm_radius" 
