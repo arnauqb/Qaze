@@ -25,8 +25,16 @@ function local_eddington_ratio(r, z, wind::WindStruct)
 end
 
 function cak_z0(r, wind::WindStruct)
-    #z0 = find_zero(z->cak_z0_aux(z, r, wind), (1e-10, 50.), Bisection())
-    z0 = find_zero(z->cak_z0_aux(z, r, wind), 50., ) 
+    #z0 = find_zero(z->cak_z0_aux(z, r, wind), 50., ) 
+    z0 = minimum(find_zeros(z->cak_z0_aux(z, r, wind), 0, 100))
+    try
+        @assert z0 > 0
+    catch
+        println("CAK z0 unphyiscal")
+        println(r)
+        println(z0)
+        throw(DomainError)
+    end
     return z0
 end
 
@@ -42,16 +50,38 @@ function cak_mdot(r, z0, wind::WindStruct)
     #a = z_0 / d^3 / wind.bh.R_g^2
     a = z0 / d^3 / wind.bh.R_g^2
     b = (K * gamma)^(1 / ALPHA)
-    return constant * a * b
+    mdot =  constant * a * b
+    try
+        @assert mdot >= 0
+    catch
+        println(mdot)
+        println(a)
+        println(b)
+        println(gamma)
+        println(z0)
+        throw(DomainError)
+    end
+
+    return mdot
 end
 
 function cak_density(r, wind::WindStruct)
     z0 = cak_z0(r, wind)
-    return cak_density(r, z0, wind)
+    n = cak_density(r, z0, wind)
+    return n
 end
 
 function cak_density(r, z0, wind::WindStruct)
     mdot = cak_mdot(r, z0, wind)
     v_th = thermal_velocity(SS_temperature(r, wind.bh)) * C
-    return  mdot / v_th / (wind.config["disk"]["mu"] * M_P) 
+    n =   mdot / v_th / (wind.config["disk"]["mu"] * M_P) 
+    try
+        @assert n >= 0
+    catch
+        println(mdot)
+        println(v_th)
+        println(wind.config["disk"]["mu"])
+        throw(DomainError)
+    end
+    return n
 end

@@ -1,5 +1,5 @@
-export thermal_velocity, eddington_luminosity, initialize_uv_fraction, nt_rel_factors, opacity_x, compute_tau_x, ionization_parameter,
-       compute_tau_eff, force_multiplier, force_radiation
+export thermal_velocity, eddington_luminosity, initialize_uv_fraction, nt_rel_factors, opacity_x, compute_taux_grid, ionization_parameter,
+       compute_tau_eff, force_multiplier, force_radiation, compute_taux_leaf, compute_tau_x
 
 function thermal_velocity(T, mu = 1.)
     v = sqrt(K_B * T / (mu * M_P)) / C
@@ -21,6 +21,9 @@ function initialize_uv_fraction(wind::WindStruct)
 end
 
 function nt_rel_factors(r, astar, isco)
+    if r <= isco
+        return 0.
+    end
     yms = sqrt(isco)
     y1 = 2 * cos((acos(astar) - pi) / 3)
     y2 = 2 * cos((acos(astar) + pi) / 3)
@@ -80,8 +83,8 @@ function compute_tau_x_old(r, z, wind::WindStruct)
     return tau
 end
 
-function compute_tau_x(r, z, wind::WindStruct)
-    if r < 0 || z < 0
+function compute_taux_grid(r, z, wind::WindStruct)
+    if r <= wind.grids.r_range[1] || z < 0
         return 0.
     end
     r1 = 0.
@@ -92,13 +95,13 @@ function compute_tau_x(r, z, wind::WindStruct)
     deltad = 0.
     r2 = wind.grids.r_range[1]
     z2 = m * r2
-    tau = sqrt(r2^2 + z2^2) * wind.bh.R_g * SIGMA_T * wind.config["wind"]["n_shielding"]
+    tau = sqrt(r2^2 + z2^2) * wind.bh.R_g * SIGMA_T * wind.grids.n_vacuum
     rp_arg = 1
     zp_arg = get_index(wind.grids.z_range, z2)
     lambda_r = 0.
     lambda_z = 0.
-    max_steps = abs(r_arg - 1) + abs(z_arg - 1) 
-    delta_d_total = 0.
+    max_steps = max(abs(r_arg - 1), abs(z_arg - 1))
+    delta_d_total = sqrt(r2^2 + z2^2) * wind.bh.R_g
     counter = 1
     #while ((rp_arg < r_arg) || (zp_arg < z_arg))
     while(true)
@@ -155,10 +158,12 @@ function compute_tau_x(r, z, wind::WindStruct)
     delta_d_total += deltad
     d2 = (r^2 + z^2) * wind.bh.R_g^2
     try
-        @assert delta_d_total ≈ sqrt(d2)
+        @assert isapprox(delta_d_total, sqrt(d2), atol=0, rtol=5e-1)
     catch
+        println("distances do not match!")
         println("r : $r z : $z")
-        @assert delta_d_total ≈ sqrt(d2)
+        println("deltad_total: $(delta_d_total/wind.bh.R_g) d2 : $(sqrt(d2)/wind.bh.R_g)")
+        @assert isapprox(delta_d_total, sqrt(d2), atol=0, rtol=1e-2)
     end
     xi0 = wind.radiation.xray_luminosity / (density * d2)
     xi = xi0
@@ -169,6 +174,58 @@ function compute_tau_x(r, z, wind::WindStruct)
     end
     tau += density * SIGMA_T * deltad * opacity_x(xi)
     return tau
+end
+
+function compute_taux_leaf(point, intersection, leaf, wind::WindStruct)
+    deltad = distance2d(point, intersection) * wind.bh.R_g
+    d = distance2d([0.,wind.z_0], point) * wind.bh.R_g
+    density = leaf.data[1]
+    xi0 = wind.radiation.xray_luminosity / (density * d^2)
+    taux = 0.
+    xi = xi0
+    for i = 1:2
+        taux = density * opacity_x(xi) * deltad * SIGMA_T
+        xi = xi0 * exp(-taux)
+    end
+    #println("point :$point, den : $density")
+    taux = density * opacity_x(xi) * deltad * SIGMA_T
+    return taux
+end
+
+function compute_tau_x(r, z, wind::WindStruct ; return_coords = false)
+    z = max(z, wind.z_0)
+    @assert z >= 0
+    #r = max(r,0.)
+    point1 = [0.0, wind.z_0]
+    coords_list = [point1]
+    point1leaf = findleaf(wind.quadtree, point1)
+    point2 = [r,z]
+    point2leaf = findleaf(wind.quadtree, point2)
+    if point1leaf == point2leaf
+        push!(coords_list, point2)
+        taux = compute_taux_leaf(point1, point2, point1leaf, wind)
+        return taux
+    end
+    intersection = compute_cell_intersection(point1, point1leaf, point1, point2)
+    taux = compute_taux_leaf(point1, intersection, point1leaf, wind)
+    currentpoint = intersection
+    push!(coords_list, intersection)
+    currentleaf = findleaf(wind.quadtree, currentpoint)
+    while currentleaf != point2leaf
+        intersection = compute_cell_intersection(currentpoint, currentleaf, point1, point2)
+        push!(coords_list, intersection)
+        taux += compute_taux_leaf(currentpoint, intersection, currentleaf, wind)
+        #println("r : $r,z : $z")
+        currentpoint = intersection
+        currentleaf = findleaf(wind.quadtree, currentpoint)
+    end
+    taux += compute_taux_leaf(currentpoint, point2, currentleaf, wind)
+    push!(coords_list, point2)
+    if return_coords
+        return taux, coords_list
+    else
+        return taux
+    end
 end
 
 function ionization_parameter(r, z, density, tau_x, wind::WindStruct)
@@ -182,6 +239,7 @@ function compute_tau_eff(density, dv_dr, v_th)
     if dv_dr == 0
         return 1.
     end
+    @assert density >= 0
     t = density * SIGMA_T * abs(v_th / dv_dr)
     return t
 end
@@ -202,6 +260,8 @@ function force_multiplier_eta(xi)
 end
 
 function force_multiplier(t, xi)
+    @assert t>= 0
+    @assert xi>= 0
     ALPHA = 0.6
     TAU_MAX_TOL = 1e-3
     k = force_multiplier_k(xi)
@@ -218,8 +278,13 @@ function force_multiplier(t, xi)
 end
 
 function force_radiation(r, z, fm, wind::WindStruct ; include_tau_uv = false)
-    if (z < 1e-3 || wind.config["wind"]["gravity_only"])
-        return [0.,0.]
+    @assert r >= 0
+    @assert z >= 0
+    if (wind.config["wind"]["gravity_only"])
+        return [0.,0]
+    end
+    if (z < 1.0)
+        return [0.0, force_radiation(r, 1.0, fm, wind, include_tau_uv = include_tau_uv)[2]]
     end
     int_values = integrate(r, z, wind, include_tau_uv=include_tau_uv)
     if wind.config["wind"]["nofm"]

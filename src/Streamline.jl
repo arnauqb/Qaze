@@ -2,8 +2,11 @@ export compute_density, initialize_line, compute_initial_acceleration, residual!
 using DifferentialEquations
 using Sundials
 using Statistics
+using RegionTrees
 
 function compute_density(r, z, v_T, line::StreamlineStruct)
+    @assert r >= 0
+    @assert z >= 0
     d = sqrt(r^2 + z^2)
     radial = (line.r_0 / d)^2
     v_ratio = line.v_0 / v_T
@@ -11,24 +14,27 @@ function compute_density(r, z, v_T, line::StreamlineStruct)
     return n
 end
 
-function initialize_line(line_id, r_0, z_0, v_0, n_0, v_th, wind::WindStruct, is_first_iter)
+function initialize_line(line_id, r_0, z_0, v_0, n_0, v_th, wind::WindStruct)
     v_phi_0 = sqrt(1. / r_0)
     l = v_phi_0 * r_0
-    a_r_0, a_z_0, fm, xi, dv_dr, tau_x = compute_initial_acceleration(r_0, z_0, v_0, n_0, v_th, l, wind, is_first_iter)
+    lw0 = wind.lines_widths[line_id]
+    linewidth_normalized = lw0 / r_0
+    fill_and_refine([r_0, z_0], [r_0, z_0], linewidth_normalized, n_0, 0., wind)
+    a_r_0, a_z_0, fm, xi, dv_dr, tau_x = compute_initial_acceleration(r_0, z_0, v_0, n_0, v_th, l, wind)
     u0 = [r_0, z_0, 0., v_0]
     du0 = [0., v_0, a_r_0, a_z_0]
-    lw0 = wind.lines_widths[line_id]
     u_hist = reshape(u0, (1,4))
     line = StreamlineStruct(wind, line_id, r_0, z_0, v_0, v_phi_0, n_0,
-                            v_th, l, lw0, false, 0, is_first_iter, u_hist,
+                            v_th, l, lw0, false, false, 0, u_hist,
                             [n_0], [tau_x], [fm], [xi], [dv_dr], [a_r_0], [a_z_0])
     tspan = (0., 1e8)
     termination_cb = DiscreteCallback(condition, affect, save_positions=(false, false))
     saved_values_type = SavedValues(Float64, Array{Float64,1})
     saving_cb = SavingCallback(save, saved_values_type)
-    cb = CallbackSet(termination_cb, saving_cb)
+    steadystate_cb = TerminateSteadyState(1e-8, 1e-6) 
+    cb = CallbackSet(termination_cb, saving_cb, steadystate_cb)
     problem = DAEProblem(residual!, du0, u0, tspan, p=line, differential_vars=[true, true, true, true])
-    integrator = init(problem, IDA(), callback=cb)
+    integrator = init(problem, IDA(), callback=cb)#, dtmax=5e-2 * wind.bh.R_g / C)
     integrator.opts.abstol = 0.
     integrator.opts.reltol = wind.config["wind"]["solver_rtol"]
     return integrator
@@ -38,12 +44,12 @@ function solve_line!(line)
     solve!(line)
 end
 
-function compute_initial_acceleration(r_0, z_0, v_0, n_0, v_th, l, wind::WindStruct, is_first_iter)
+function compute_initial_acceleration(r_0, z_0, v_0, n_0, v_th, l, wind::WindStruct)
     fg = gravity(r_0, z_0, wind.bh)
     tau_x = compute_tau_x(r_0, z_0, wind)
     xi = ionization_parameter(r_0, z_0, n_0, tau_x, wind)
     fm = force_multiplier(1, xi)
-    fr = force_radiation(r_0, z_0, fm, wind, include_tau_uv=!is_first_iter)
+    fr = force_radiation(r_0, z_0, fm, wind, include_tau_uv=wind.radiation.include_tauuv)
     centrifugal_term = l^2 / r_0^3
     a_r = fg[1] + fr[1] + centrifugal_term
     a_z = fg[2] + fr[2] 
@@ -52,7 +58,7 @@ function compute_initial_acceleration(r_0, z_0, v_0, n_0, v_th, l, wind::WindStr
     dv_dr = a_T / v_0
     tau_eff = compute_tau_eff(n_0, dv_dr, v_th)
     fm = force_multiplier(tau_eff, xi)
-    fr = force_radiation(r_0, z_0, fm, wind, include_tau_uv=!is_first_iter)
+    fr = force_radiation(r_0, z_0, fm, wind, include_tau_uv=wind.radiation.include_tauuv)
     a_r = fg[1] + fr[1] + centrifugal_term
     a_z = fg[2] + fr[2] 
     return [a_r, a_z, fm, xi, dv_dr, tau_x]
@@ -61,6 +67,18 @@ end
 function residual!(resid, du, u, line, t)
     r, z, v_r, v_z = u
     r_dot, z_dot, v_r_dot, v_z_dot = du
+    if r < 0 || z < 0
+        #println("warning, out of domain")
+        fg = gravity(r, z, line.wind.bh)
+        centrifugal_term = line.l^2 / r^3
+        a_r = fg[1] + centrifugal_term
+        a_z = fg[2]
+        resid[1] = r_dot - v_r
+        resid[2] = z_dot - v_z
+        resid[3] = v_r_dot - a_r
+        resid[4] = v_z_dot - a_z
+        return nothing
+    end
     fg = gravity(r, z, line.wind.bh)
     v_T = sqrt(r_dot^2 + z_dot^2)
     a_T = sqrt(v_r_dot^2 + v_z_dot^2)
@@ -70,7 +88,7 @@ function residual!(resid, du, u, line, t)
     xi = ionization_parameter(r, z, n, tau_x, line.wind)
     tau_eff = compute_tau_eff(n, dv_dr, line.v_th)
     fm = force_multiplier(tau_eff, xi)
-    fr = force_radiation(r, z, fm, line.wind, include_tau_uv=!line.is_first_iter)
+    fr = force_radiation(r, z, fm, line.wind, include_tau_uv=line.wind.radiation.include_tauuv)
     centrifugal_term = line.l^2 / r^3
     a_r = fg[1] + fr[1] + centrifugal_term
     a_z = fg[2] + fr[2] 
@@ -90,14 +108,26 @@ function condition(u, t, integrator)
         integrator.p.escaped = true
     end
     crossing_condition = false
-    if r < integrator.p.r_0
-        integrator.p.crossing_counter += 1
-        if integrator.p.crossing_counter > 4
-            crossing_condition = true
-        end
+    #if r < integrator.p.r_0
+    #    integrator.p.crossing_counter += 1
+    #    if integrator.p.crossing_counter >= 4
+    #        crossing_condition = true
+    #    end
+    #end
+
+    #stalling_condition = false
+    #z_hist = integrator.p.u_hist[:,2]
+    #if length(z_hist) > 200
+    #    if std(z_hist[end-10:end]) < 0.02
+    #        println("stalled")
+    #        stalling_condition = true
+    #    end
+    #end
+    escaped_condition = (r >= integrator.p.wind.grids.r_range[end]) || (z >= integrator.p.wind.grids.z_range[end])
+    if escaped_condition
+        integrator.p.outofdomain = true
     end
-    escaped_condition = (r > integrator.p.wind.grids.r_range[end]) || (z > integrator.p.wind.grids.z_range[end])
-    failed_condtion = z < integrator.p.z_0 
+    failed_condtion = z < integrator.p.z_0  || r < 0.
     cond = escaped_condition | failed_condtion | crossing_condition 
     return cond
 end
@@ -105,6 +135,8 @@ end
 function affect(integrator)
     if integrator.p.escaped
         print(" \U1F4A8")
+    elseif integrator.p.outofdomain
+        print(" \U2753")
     else
         print(" \U1F4A5")
     end
@@ -113,6 +145,10 @@ end
 
 function save(u, t, integrator)
     r, z, v_r, v_z = u
+    if any([r,z] .< 0)
+        terminate!(integrator)
+        return u
+    end
     du = get_du(integrator)
     v_r_dot, v_z_dot, a_r, a_z = du
     v_T = sqrt(v_r^2 + v_z^2)
@@ -124,12 +160,19 @@ function save(u, t, integrator)
     tau_eff = compute_tau_eff(n, dv_dr, integrator.p.v_th)
     fm = force_multiplier(tau_eff, xi)
     r_0, z_0, v_r_0, v_z_0 = integrator.p.u_hist[end,:]
-    lw = integrator.p.line_width / integrator.p.r_0 * r
-    if integrator.p.wind.config["radiation"]["tau_uv_include_fm"]
-        update_density_and_fm_lines(r_0, r, z_0, z, lw, n, fm, integrator.p.line_id, integrator.p.wind)
-    else
-        update_density_and_fm_lines(r_0, r, z_0, z, lw, n, 0., integrator.p.line_id, integrator.p.wind)
-    end
+    #lw = integrator.p.line_width / integrator.p.r_0 * r
+    linewidth_normalized = integrator.p.line_width / integrator.p.r_0 
+    #if integrator.p.wind.config["radiation"]["tau_uv_include_fm"]
+    #    update_density_and_fm_lines(r_0, r, z_0, z, lw, n, fm, integrator.p.line_id, integrator.p.wind)
+    #else
+    #    update_density_and_fm_lines(r_0, r, z_0, z, lw, n, 0., integrator.p.line_id, integrator.p.wind)
+    #end
+    currentpoint = [r, z]
+    previouspoint = [r_0, z_0]
+    #fill_point(currentpoint, previouspoint, linewidth_normalized, n, fm, integrator.p.wind)
+    #currentleaf = findleaf(integrator.p.wind.quadtree, [r,z])
+    #refine_line([r,z], currentleaf, integrator, integrator.p.wind)
+    fill_and_refine(previouspoint, currentpoint, linewidth_normalized, n, fm, integrator.p.wind)
     integrator.p.u_hist = [integrator.p.u_hist ; transpose(u)]
     push!(integrator.p.fm_hist, fm)
     push!(integrator.p.n_hist, n)

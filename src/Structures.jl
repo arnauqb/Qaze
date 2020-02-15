@@ -1,11 +1,16 @@
 using PyCall
-export GridsStruct, BlackHoleStruct, RadiationStruct, StreamlineStruct, WindStruct
+using RegionTrees: AbstractRefinery, Cell
+export GridsStruct, BlackHoleStruct, RadiationStruct, StreamlineStruct, WindStruct, GridRefinery
 
 struct GridsStruct
     n_r::Int64
     n_z::Int64
     n_disk::Int64
     n_lines::Int64
+    r_min::Float64
+    r_max::Float64
+    z_min::Float64
+    z_max::Float64
     r_range::Array{Float64,1}
     z_range::Array{Float64,1}
     d_max::Float64
@@ -18,6 +23,7 @@ struct GridsStruct
     fm_lines::Array{Float64, 3}
     mdot::Array{Float64,1}
     uv_fractions::Array{Float64,1}
+    n_vacuum::Float64
 end
 
 struct BlackHoleStruct
@@ -31,13 +37,15 @@ struct BlackHoleStruct
     disk_r_max::Float64
 end
 
-struct RadiationStruct
+mutable struct RadiationStruct
     bol_luminosity::Float64
     eddington_luminosity::Float64
     f_uv::Float64
     f_x::Float64
     xray_luminosity::Float64
     force_constant::Float64
+    include_tauuv::Bool
+    include_fm_in_tauuv::Bool
 end
 
 mutable struct WindStruct
@@ -45,11 +53,13 @@ mutable struct WindStruct
     bh::BlackHoleStruct
     sed::PyObject
     grids::GridsStruct
+    quadtree::Cell
     radiation::RadiationStruct
     lines::Array{Any,1}
     lines_initial_radius::Float64
     lines_range::Array{Float64,1}
     lines_widths::Array{Float64,1}
+    z_0::Float64
 end
 
 mutable struct StreamlineStruct
@@ -64,8 +74,8 @@ mutable struct StreamlineStruct
     l::Float64 # specific angular momentum
     line_width::Float64
     escaped::Bool
+    outofdomain::Bool
     crossing_counter::Int64
-    is_first_iter::Bool
     u_hist::Array{Float64,2}
     n_hist::Array{Float64,1}
     tau_x_hist::Array{Float64,1}

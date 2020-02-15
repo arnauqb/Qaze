@@ -1,6 +1,7 @@
 export initialize_grids, update_density_and_fm_lines, erase_line_from_grid,
-    update_mdot_grid, update_taux_and_xi_grid, refine_density_grid, fill_density_and_fm_grid, compute_tau_uv_grid
+    update_mdot_grid, update_taux_and_xi_grid, refine_density_grid, fill_density_and_fm_grid, compute_tau_uv_grid, compute_optical_thickness_grid
 using Statistics
+
 
 function initialize_grids(config::Dict, qsosed)
     disk_r_min = config["disk"]["inner_radius"]
@@ -12,6 +13,7 @@ function initialize_grids(config::Dict, qsosed)
     z_min = config["grids"]["z_min"]
     r_max = config["grids"]["r_max"]
     z_max = config["grids"]["z_max"]
+    n_vacuum = config["grids"]["n_vacuum"]
     n_lines = config["wind"]["number_streamlines"]
     if config["grids"]["log_spaced"]
         r_range = logrange(r_min, r_max, n_r)
@@ -26,11 +28,15 @@ function initialize_grids(config::Dict, qsosed)
         n_z,
         n_disk,
         n_lines,
+        r_min,
+        r_max,
+        z_min,
+        z_max,
         r_range,
         z_range,
         sqrt(r_max^2 + z_max^2), # d_max
         disk_range,
-        config["wind"]["n_shielding"] * ones(Float64, n_r, n_z), #density
+        n_vacuum * ones(Float64, n_r, n_z), #density
         zeros(Float64, n_lines, n_r, n_z), # density lines
         zeros(Float64, n_r, n_z), #tau_x
         zeros(Float64, n_r, n_z), #ionization
@@ -38,44 +44,12 @@ function initialize_grids(config::Dict, qsosed)
         zeros(Float64, n_lines, n_r, n_z), # fm lines
         config["bh"]["mdot"].* ones(Float64, n_disk), #mdot
         ones(Float64, n_disk), #uv fraction
+        n_vacuum,
     )
     return grids
 end
 
-#=
-function refine_density_grid(r_range_old, r_range_new, z_range_old, z_range_new, density_old)
-    n_r = length(r_range_new)
-    n_z = length(z_range_new)
-    density_new  = zeros(Float64, n_r, n_z)
-    for i in 1:n_r
-        r = r_range_new[i]
-        r_old_arg = searchsortedfirst(r_range_old, r)
-        for j in 1:n_z
-            z = z_range_new[j]
-            z_old_arg = searchsortedfirst(z_range_old, z)
-            density_interp = 0.
-            counter = 0
-            for k1 in 0:2
-                if (r_old_arg + k1) > length(r_range_old)
-                    continue
-                end
-                for k2 in -1:1
-                    if ((z_old_arg + k2) > length(z_range_old) || (z_old_arg + k2) < 1)
-                        continue
-                    end
-                    density_interp += log10(density_old[r_old_arg + k1, z_old_arg + k2])
-                    counter += 1
-                end
-            end
-            density_interp = 10^(density_interp / counter)
-            density_new[i,j] = density_interp
-        end
-    end
-    return density_new
-end
-
-function refine_density_grid(wind::WindStruct)
-    println("Computing optical depths ...")
+function compute_optical_thickness_grid(wind::WindStruct)
     delta_taus = zeros(Float64, wind.grids.n_r, wind.grids.n_z)
     for i in 1:wind.grids.n_r - 1
         r1 = wind.grids.r_range[i]
@@ -89,6 +63,12 @@ function refine_density_grid(wind::WindStruct)
             delta_taus[i,j] = delta_tau
         end
     end
+    return delta_taus
+end
+
+function refine_density_grid(wind::WindStruct)
+    println("Computing optical depths ...")
+    delta_taus = compute_optical_thickness_grid(wind)
     println("refining grid...")
     opt_thick_locations = findall(x -> x>0.1, delta_taus)
     if length(opt_thick_locations) == 0
@@ -105,10 +85,10 @@ function refine_density_grid(wind::WindStruct)
             push!(r_arg_list, r_arg)
             push!(z_arg_list, z_arg)
         else
-            if !(r_arg == r_arg_list[end])
+            if r_arg != r_arg_list[end]
                 push!(r_arg_list, r_arg)
             end
-            if !(z_arg == z_arg_list[end])
+            if z_arg != z_arg_list[end]
                 push!(z_arg_list, z_arg)
             end
         end
@@ -168,7 +148,7 @@ function refine_density_grid(wind::WindStruct)
     end
     newsize_r = length(r_range_new)
     newsize_z = length(z_range_new)
-    density_new = refine_density_grid(wind.grids.r_range, r_range_new, wind.grids.z_range, z_range_new, wind.grids.density)
+    #density_new = refine_density_grid(wind.grids.r_range, r_range_new, wind.grids.z_range, z_range_new, wind.grids.density)
     grids = GridsStruct(
         newsize_r,
         newsize_z,
@@ -178,7 +158,7 @@ function refine_density_grid(wind::WindStruct)
         z_range_new,
         sqrt(wind.grids.r_range[end]^2 + wind.grids.z_range[end]^2), # d_max
         wind.grids.disk_range,
-        density_new, #wind.config["wind"]["n_shielding"] * ones(Float64, newsize_r, newsize_z), #density
+        wind.grids.n_vacuum * ones(Float64, newsize_r, newsize_z), #density
         zeros(Float64, wind.grids.n_lines, newsize_r, newsize_z), # density lines
         zeros(Float64, newsize_r, newsize_z), #tau_x
         zeros(Float64, newsize_r, newsize_z), #ionization
@@ -188,11 +168,10 @@ function refine_density_grid(wind::WindStruct)
         ones(Float64, wind.grids.n_disk), #uv fraction
     )
     wind.grids = grids
-    #println("filling grids...")
-    #fill_density_and_fm_grid(wind)
+    println("filling grids...")
+    fill_density_and_fm_grid(wind)
     return nothing
 end
-=#
 
 function fill_density_and_fm_grid(wind::WindStruct)
     for (line_id, line) in enumerate(wind.lines)
@@ -221,6 +200,24 @@ function update_density_and_fm_lines(r1, r2, z1, z2, lw, rho, fm, line_id, wind:
         rmax_arg = get_index(wind.grids.r_range, r2)
         wind.grids.density_lines[line_id, rmin_arg:rmax_arg, z1_arg] .= rho
         wind.grids.fm_lines[line_id, rmin_arg:rmax_arg, z1_arg] .= fm
+        for r_arg in rmin_arg:rmax_arg
+            idx_nz = findall(!iszero, wind.grids.density_lines[:, r_arg, z1_arg])
+            if length(idx_nz) == 0
+                continue
+            else
+                values = wind.grids.density_lines[idx_nz, r_arg, z1_arg]
+                rho_mean = maximum(values)#mean(values)
+                wind.grids.density[r_arg, z1_arg] = rho_mean
+            end
+            idx_nz = findall(!iszero, wind.grids.fm_lines[:, r_arg, z1_arg])
+            if length(idx_nz) == 0
+                continue
+            else
+                values = wind.grids.fm_lines[idx_nz, r_arg, z1_arg]
+                fm_mean = maximum(values) #mean(values)
+                wind.grids.fm[r_arg, z1_arg] = fm_mean
+            end
+        end
     else
         m = (r2 - r1) / (z2 - z1)
         n = r2 - m * z2
@@ -237,7 +234,7 @@ function update_density_and_fm_lines(r1, r2, z1, z2, lw, rho, fm, line_id, wind:
                     continue
                 else
                     values = wind.grids.density_lines[idx_nz, r_arg, z_arg]
-                    rho_mean = mean(values)
+                    rho_mean = maximum(values)#mean(values)
                     wind.grids.density[r_arg, z_arg] = rho_mean
                 end
                 idx_nz = findall(!iszero, wind.grids.fm_lines[:, r_arg, z_arg])
@@ -245,12 +242,13 @@ function update_density_and_fm_lines(r1, r2, z1, z2, lw, rho, fm, line_id, wind:
                     continue
                 else
                     values = wind.grids.fm_lines[idx_nz, r_arg, z_arg]
-                    fm_mean = mean(values)
+                    fm_mean = maximum(values) #mean(values)
                     wind.grids.fm[r_arg, z_arg] = fm_mean
                 end
             end
         end
     end
+    return nothing
 end
 
 function erase_line_from_grid(line_id, wind::WindStruct)

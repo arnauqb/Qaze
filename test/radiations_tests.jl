@@ -20,9 +20,9 @@ end
     z_range = range(1e-4, stop=1000, length=50)
     for r in r_range
         for z in z_range
-            tau_truth = wind.config["wind"]["n_shielding"] * sqrt.(r^2 + z^2) * SIGMA_T * wind.bh.R_g
+            tau_truth = wind.grids.n_vacuum * sqrt.(r^2 + (z - wind.z_0)^2) * SIGMA_T * wind.bh.R_g
             tauuv = compute_tau_x(r, z, wind)
-            @test tauuv ≈ tau_truth rtol=1e-4 atol=0
+            @test tauuv ≈ tau_truth rtol=1e-2 atol=0
         end
     end
 end

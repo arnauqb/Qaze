@@ -24,7 +24,9 @@ n_r = 50
 n_z = 50
 n_r_disk = 101 
 n_phi_disk = 251
+n_vacuum = 1e2
 log_spaced = false
+tree_initial_divisions = 6
 
 [radiation]
 f_uv = "auto" 
@@ -46,7 +48,6 @@ final_radius = 1000.0
 number_streamlines = 20
 iterations = 1
 log_spaced = false
-n_shielding = 1e2
 wind_temperature = "disk"
 initial_conditions = "manual"
 n_0 = "cak"

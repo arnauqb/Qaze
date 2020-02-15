@@ -1,2 +1,6 @@
 *.json
 Manifest.toml
+*.png
+*.gif
+*.svg
+profiling.jl

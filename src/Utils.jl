@@ -7,6 +7,10 @@ function logrange(start, stop, length)
     return 10 .^log_range
 end
 
+function distance2d(point1, point2)
+    return sqrt( (point1[1]-point2[1])^2 + (point2[2] - point1[2])^2 )
+end
+
 function drawline(x1::Int64, y1::Int64, x2::Int64, y2::Int64)
     x=x1
     y=y1
@@ -77,7 +81,7 @@ function initialize_json(json_file, wind::WindStruct)
 
     data["metadata"]["f_uv"] = wind.radiation.f_uv
     data["metadata"]["f_x"] = wind.radiation.f_x
-    data["metadata"]["rho_shielding"] = wind.config["wind"]["n_shielding"]
+    data["metadata"]["n_vacuum"] = wind.grids.n_vacuum
     data["metadata"]["r_in"] = wind.config["wind"]["initial_radius"]
     data["metadata"]["r_out"] = wind.config["wind"]["final_radius"]
     for it in 1:wind.config["wind"]["iterations"]
@@ -143,5 +147,5 @@ function write_properties_and_grids(json_file, wind::WindStruct, it_num)
         data[@sprintf("it_%02d", it_num)]["grids"] = grids 
         JSON.print(f,data)
     end
+    return nothing
 end
-
