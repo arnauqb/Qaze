@@ -21,6 +21,9 @@ function initialize_uv_fraction(wind::WindStruct)
 end
 
 function nt_rel_factors(r, astar, isco)
+    if r <= isco
+        return 0.
+    end
     yms = sqrt(isco)
     y1 = 2 * cos((acos(astar) - pi) / 3)
     y2 = 2 * cos((acos(astar) + pi) / 3)
@@ -275,8 +278,13 @@ function force_multiplier(t, xi)
 end
 
 function force_radiation(r, z, fm, wind::WindStruct ; include_tau_uv = false)
-    if (z <= 1e-3 || wind.config["wind"]["gravity_only"])
-        return [0.,0.]
+    @assert r >= 0
+    @assert z >= 0
+    if (wind.config["wind"]["gravity_only"])
+        return [0.,0]
+    end
+    if (z < 1.0)
+        return [0.0, force_radiation(r, 1.0, fm, wind, include_tau_uv = include_tau_uv)[2]]
     end
     int_values = integrate(r, z, wind, include_tau_uv=include_tau_uv)
     if wind.config["wind"]["nofm"]

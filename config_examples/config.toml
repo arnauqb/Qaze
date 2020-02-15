@@ -27,12 +27,13 @@ n_phi_disk = 251
 n_vacuum = 1e2
 log_spaced = false 
 tree_initial_divisions = 2
+cell_optical_thickness = 0.2
 
 [radiation]
 f_uv = "auto" 
 f_x = "auto"
 non_adaptive_integral = false
-integral_rtol = 5e-3
+integral_rtol = 1e-3
 analytical_fm = true
 tau_uv_geometry = "disk"
 disk_uv_fraction = true 
@@ -45,14 +46,14 @@ tau_x_ignore_grid = false
 [wind]
 initial_radius = "warm_radius" 
 final_radius = 2000.0
-number_streamlines = 50
-iterations = 3
+number_streamlines = 60
+iterations = 5
 log_spaced = false
 wind_temperature = "disk"
 initial_conditions = "manual"
-n_0 = "cak"
+n_0 = 1e9
 v_0 = "thermal"
-z_0 = 1.0
+z_0 = 0.0
 solver_rtol = 1e-2
 gravity_only = false 
 nofm = false

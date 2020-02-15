@@ -173,7 +173,7 @@ function refine_leaf(currentpoint, leaf, n, fm, wind)
     while !optically_thin
         optically_thin = true
         maxz = vertices(leaf.boundary)[2,2][2]
-        refine_condition = (leaf.data[3] > 0.1) && (maxz > wind.z_0) 
+        refine_condition = (leaf.data[3] > wind.config["grids"]["cell_optical_thickness"]) && (maxz > wind.z_0) 
         if refine_condition
             optically_thin = false
             split!(leaf, split_cell_initialization)

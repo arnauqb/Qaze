@@ -17,10 +17,12 @@ end
 function initialize_line(line_id, r_0, z_0, v_0, n_0, v_th, wind::WindStruct)
     v_phi_0 = sqrt(1. / r_0)
     l = v_phi_0 * r_0
+    lw0 = wind.lines_widths[line_id]
+    linewidth_normalized = lw0 / r_0
+    fill_and_refine([r_0, z_0], [r_0, z_0], linewidth_normalized, n_0, 0., wind)
     a_r_0, a_z_0, fm, xi, dv_dr, tau_x = compute_initial_acceleration(r_0, z_0, v_0, n_0, v_th, l, wind)
     u0 = [r_0, z_0, 0., v_0]
     du0 = [0., v_0, a_r_0, a_z_0]
-    lw0 = wind.lines_widths[line_id]
     u_hist = reshape(u0, (1,4))
     line = StreamlineStruct(wind, line_id, r_0, z_0, v_0, v_phi_0, n_0,
                             v_th, l, lw0, false, false, 0, u_hist,
@@ -106,13 +108,14 @@ function condition(u, t, integrator)
         integrator.p.escaped = true
     end
     crossing_condition = false
-    if r < integrator.p.r_0
-        integrator.p.crossing_counter += 1
-        if integrator.p.crossing_counter >= 4
-            crossing_condition = true
-        end
-    end
-    stalling_condition = false
+    #if r < integrator.p.r_0
+    #    integrator.p.crossing_counter += 1
+    #    if integrator.p.crossing_counter >= 4
+    #        crossing_condition = true
+    #    end
+    #end
+
+    #stalling_condition = false
     #z_hist = integrator.p.u_hist[:,2]
     #if length(z_hist) > 200
     #    if std(z_hist[end-10:end]) < 0.02
@@ -121,14 +124,19 @@ function condition(u, t, integrator)
     #    end
     #end
     escaped_condition = (r >= integrator.p.wind.grids.r_range[end]) || (z >= integrator.p.wind.grids.z_range[end])
+    if escaped_condition
+        integrator.p.outofdomain = true
+    end
     failed_condtion = z < integrator.p.z_0  || r < 0.
-    cond = escaped_condition | failed_condtion | crossing_condition | stalling_condition
+    cond = escaped_condition | failed_condtion | crossing_condition 
     return cond
 end
 
 function affect(integrator)
     if integrator.p.escaped
         print(" \U1F4A8")
+    elseif integrator.p.outofdomain
+        print(" \U2753")
     else
         print(" \U1F4A5")
     end

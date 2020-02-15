@@ -24,6 +24,7 @@ function start_line(line_id, r_0, wind::WindStruct)
     line = initialize_line(line_id, r_0, wind)
     wind.lines[line_id] = line
     @printf("\nSolving line %02d of %02d ", line_id, length(wind.lines))
+    flush(stdout)
     solve!(line)
     flush(stdout)
     return line
