@@ -11,13 +11,9 @@ branches:
   only: master
 
 script:
-  - sudo apt install -y python3-venv
-  - python3 -m venv qaze
-  - source qaze/bin/activate
-  - git clone https://github.com/arnauqb/qsosed
-  - cd qsosed
+  - source ~/virtualenv/python3.7/bin/activate
   - pip install matplotlib
-  - pip install -r requirements.txt
-  - pip install -e .
+  - git clone https://github.com/arnauqb/qsosed
+  - cd qsosed && pip install -r requirements.txt && pip install -e .
   - cd ..
   - julia -e 'using Pkg; Pkg.add(PackageSpec(url="https://github.com/wildart/TOML.jl.git", rev="master")); Pkg.activate("."); Pkg.test("Qaze", coverage=true);'
