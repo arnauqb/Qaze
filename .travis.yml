@@ -10,5 +10,5 @@ coveralls: true
 branches:
   only: master
 
-  #script:
-  #  - julia -e 'using Pkg; Pkg.activate("."); Pkg.build(); Pkg.test("Qaze"; coverage=true)'
+script:
+  - julia -e 'using Pkg; Pkg.instantiate(); Pkg.test("Qaze", coverage=true);'
