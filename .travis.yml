@@ -11,4 +11,7 @@ branches:
   only: master
 
 script:
-  - julia -e 'using Pkg; ] add https://github.com/wildart/TOML.jl.git; Pkg.test("Qaze", coverage=true);'
+  - julia -e 'using Pkg;'
+  - julia -e 'Pkg.add(PackageSpec(url="https://github.com/wildart/TOML.jl.git", rev="master"))'
+  - julia -e 'Pkg.activate(".");'
+  - julia -e 'Pkg.test("Qaze", coverage=true);'
