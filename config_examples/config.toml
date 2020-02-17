@@ -24,7 +24,7 @@ n_r_disk = 501
 n_vacuum = 1e2
 log_spaced = false 
 tree_initial_divisions = 2
-cell_optical_thickness = 0.3
+cell_optical_thickness = 0.1
 
 [radiation]
 f_uv = "auto" 
@@ -42,7 +42,7 @@ tau_uv_include_fm = false
 initial_radius = "warm_radius" 
 final_radius = 2000.0
 number_streamlines = 60
-iterations = 3
+iterations = 1
 log_spaced = false
 wind_temperature = "disk"
 initial_conditions = "manual"

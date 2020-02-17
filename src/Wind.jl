@@ -1,7 +1,7 @@
 using Printf
 
-export initialize_line, start_lines, compute_line_mdot, compute_wind_mdot,
-       compute_kinetic_luminosity, compute_maximum_velocity, start_lines_animation, start_iteration, start_line
+export initialize_line!, start_lines!, compute_line_mdot, compute_wind_mdot,
+       compute_kinetic_luminosity, compute_maximum_velocity, start_iteration!, start_line!
 
 function initialize_line!(i, r, wind::WindStruct)
     T = wind.sed.disk_nt_temperature4(r)^(0.25)
@@ -16,7 +16,7 @@ function initialize_line!(i, r, wind::WindStruct)
         n_0 = cak_density(r, wind)
     end
     z_0 = wind.z_0
-    line_integ = initialize_line(i, r, z_0, v_0, n_0, v_th, wind)
+    line_integ = initialize_line!(i, r, z_0, v_0, n_0, v_th, wind)
     return line_integ
 end
 
@@ -40,7 +40,7 @@ function start_iteration!(it_num, wind::WindStruct)
     end
 end
 
-function start_lines(wind::WindStruct)
+function start_lines!(wind::WindStruct)
     wind.radiation.include_tauuv = false
     for it_num in 1:wind.config["wind"]["iterations"]
         @printf("Iteration %02d of %02d\n", it_num, wind.config["wind"]["iterations"])

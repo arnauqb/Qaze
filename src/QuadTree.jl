@@ -6,7 +6,7 @@ export copy,
        compute_cell_intersection,
        compute_cell_size,
        refine_leaf!,
-       fill_cell,
+       fill_cell!,
        fill_and_refine_linewidth!,
        fill_and_refine!,
        fill_and_refine_line!,
@@ -190,6 +190,12 @@ function erase_line_from_tree!(line_id, wind::WindStruct)
     n_vacuum = wind.grids.n_vacuum
     line.p.n_hist .= n_vacuum * ones(Float64, size(line.p.n_hist))
     line.p.fm_hist .= zeros(Float64, size(line.p.fm_hist))
+    for i in 1:length(wind.lines)
+        isassigned(wind.lines, i) || continue
+        (i == line_id) && continue
+        line = wind.lines[i]
+        fill_and_refine_line!(line, wind)
+    end
     fill_and_refine_all_lines!(wind)
 end
 

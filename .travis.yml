@@ -1,0 +1,9 @@
+language: julia
+julia:
+  - 1.3
+codecov: true
+coveralls: true
+branches:
+  only: master
+script:
+  - julia -e 'using Pkg; Pkg.build(); Pkg.test("Qaze"; coverage=true)'

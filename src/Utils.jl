@@ -109,6 +109,14 @@ function write_line(json_file, line::StreamlineStruct, it_num)
     data = open(json_file, "r") do f
         data = JSON.parse(f)
     end
+    if !haskey(data, @sprintf("it_%02d", it_num))
+        data[@sprintf("it_%02d", it_num)] = Dict(
+                "lines" => [],
+                "lines_escaped" => [],
+                #"grids" => Dict(),
+                "properties" => Dict()
+        )
+    end
     open(json_file, "w") do f
         push!(data[@sprintf("it_%02d", it_num)]["lines"], line_data)
         JSON.print(f, data)

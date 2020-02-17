@@ -18,7 +18,7 @@ function compute_density(r, z, v_T, line::StreamlineStruct)
 end
 
 "Initializes the IDA solver given the initial conditions"
-function initialize_line(line_id, r_0, z_0, v_0, n_0, v_th, wind::WindStruct)
+function initialize_line!(line_id, r_0, z_0, v_0, n_0, v_th, wind::WindStruct)
     v_phi_0 = sqrt(1. / r_0) # initial kepler velocity
     l = v_phi_0 * r_0 # initial angular momentum
     lw0 = wind.lines_widths[line_id]
@@ -180,7 +180,7 @@ function save(u, t, integrator)
     xi = ionization_parameter(r, z, n, tau_x, integrator.p.wind)
     tau_eff = compute_tau_eff(n, dv_dr, integrator.p.v_th)
     fm = force_multiplier(tau_eff, xi)
-    r_0, z_0, v_r_0, v_z_0 = integrator.p.u_hist[end,:]
+    r_0, z_0, v_r_0, v_z_0 = integrator.p.u_hist[end, :]
     linewidth_normalized = integrator.p.line_width / integrator.p.r_0 
     currentpoint = [r, z]
     previouspoint = [r_0, z_0]
