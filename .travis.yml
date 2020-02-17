@@ -10,9 +10,16 @@ coveralls: true
 branches:
   only: master
 
+before_install:
+  - sudo apt-get update
+  - sudo apt-get install python3
+
 script:
   - git clone https://github.com/arnauqb/qsosed
   - cd qsosed
-  - julia -e 'using Pkg; Pkg.add("PyCall"); using PyCall; run(`$(PyCall.pyprogramname) -m pip install -r requirements.txt`); run(`$(PyCall.pyprogramname) -m pip install -e .`); run(`$(PyCall.pyprogramname) -m pip install matplotlib`);'
+  - pip3 install -r requirements.txt
+  - pip3 install -r matplotlib
+  - pip3 install -e .
+    #- julia -e 'using Pkg; Pkg.add("PyCall"); using PyCall; run(`$(PyCall.pyprogramname) -m pip install -r requirements.txt`); run(`$(PyCall.pyprogramname) -m pip install -e .`); run(`$(PyCall.pyprogramname) -m pip install matplotlib`);'
   - cd ..
   - julia -e 'using Pkg; Pkg.add(PackageSpec(url="https://github.com/wildart/TOML.jl.git", rev="master")); Pkg.activate("."); Pkg.test("Qaze", coverage=true);'
