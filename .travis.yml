@@ -11,4 +11,4 @@ branches:
   only: master
 
 script:
-  - julia -e 'using Pkg; Pkg.build(); Pkg.test("Qaze"; coverage=true)'
+  - julia -e 'using Pkg; Pkg.activate("."); Pkg.build(); Pkg.test("Qaze"; coverage=true)'
