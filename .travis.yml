@@ -11,4 +11,10 @@ branches:
   only: master
 
 script:
+  - git clone https://github.com/arnauqb/qsosed
+  - cd qsosed
+  - pip install matplotlib
+  - pip install -r requirements
+  - pip install -e .
+  - cd ..
   - julia -e 'using Pkg; Pkg.add(PackageSpec(url="https://github.com/wildart/TOML.jl.git", rev="master")); Pkg.activate("."); Pkg.test("Qaze", coverage=true);'
