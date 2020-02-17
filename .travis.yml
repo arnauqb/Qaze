@@ -18,8 +18,9 @@ before_install:
 script:
   - git clone https://github.com/arnauqb/qsosed
   - cd qsosed
+  - pip3 install --upgrade pip
   - pip3 install -r requirements.txt
-  - pip3 install -r matplotlib
+  - pip3 install matplotlib
   - pip3 install -e .
     #- julia -e 'using Pkg; Pkg.add("PyCall"); using PyCall; run(`$(PyCall.pyprogramname) -m pip install -r requirements.txt`); run(`$(PyCall.pyprogramname) -m pip install -e .`); run(`$(PyCall.pyprogramname) -m pip install matplotlib`);'
   - cd ..
