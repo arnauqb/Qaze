@@ -8,14 +8,13 @@ using RegionTrees
 "Updates the density of the streamline giving its current position and velocity,
 using mass conservation."
 function compute_density(r, z, v_T, line::StreamlineStruct)
-    #@assert r >= 0
-    #@assert z >= 0
-    #d = sqrt(r^2 + z^2)
-    #radial = (line.r_0 / d)^2
-    #v_ratio = line.v_0 / v_T
-    #n = line.n_0 * radial * v_ratio
-    #return n
-    return line.n_0
+    @assert r >= 0
+    @assert z >= 0
+    d = sqrt(r^2 + z^2)
+    radial = (line.r_0 / d)^2
+    v_ratio = line.v_0 / v_T
+    n = line.n_0 * radial * v_ratio
+    return n
 end
 
 "Initializes the IDA solver given the initial conditions"
