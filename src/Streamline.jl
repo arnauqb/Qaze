@@ -91,7 +91,7 @@ end
 function residual!(resid, du, u, line, t)
     r, z, v_r, v_z = u
     r_dot, z_dot, v_r_dot, v_z_dot = du
-    if r < 0 || z < 0 # if integrator tries outside domain, switch off radiation
+    if z < 0 || r < 0 # if integrator tries outside domain, switch off radiation
         fg = gravity(r, z, line.wind.bh)
         centrifugal_term = line.l^2 / r^3
         a_r = fg[1] + centrifugal_term
@@ -130,12 +130,12 @@ function condition(u, t, integrator)
     v_esc = sqrt(2. / d)
     v_T > v_esc && (integrator.p.escaped=true)
     crossing_condition = false
-    #if r < integrator.p.r_0
-    #    integrator.p.crossing_counter += 1
-    #    if integrator.p.crossing_counter >= 4
-    #        crossing_condition = true
-    #    end
-    #end
+    if r < integrator.p.r_0 - 1
+        integrator.p.crossing_counter += 1
+        if integrator.p.crossing_counter >= 10
+            crossing_condition = true
+        end
+    end
 
     #stalling_condition = false
     #z_hist = integrator.p.u_hist[:,2]

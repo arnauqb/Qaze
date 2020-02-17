@@ -48,6 +48,7 @@ function start_lines(wind::WindStruct)
         if it_num > 1
             update_mdot_grid!(wind)
             wind.radiation.include_tauuv = true
+            wind.config["radiation"]["tau_uv_include_fm"] && (wind.radiation.include_fm_tauuv = true)
         end
         start_iteration!(it_num, wind)
         #refine_all(wind)

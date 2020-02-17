@@ -19,7 +19,7 @@ Compute the UV optical depth from a disc patch located at (r_d, phi_d),
 until a gas element at (r,z). 
 """
 function tau_uv_disk_blob(r_d, phi_d, r, z, wind::WindStruct)
-    r_d > r ? backwards=false : backwards = true
+    r_d > r ? backwards = true : backwards = false
     point1 = [r_d, wind.z_0]
     point1leaf = findleaf(wind.quadtree, point1)
     point2 = [r,z]

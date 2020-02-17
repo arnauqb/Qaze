@@ -6,6 +6,7 @@ export copy,
        compute_cell_intersection,
        compute_cell_size,
        refine_leaf!,
+       fill_cell,
        fill_and_refine_linewidth!,
        fill_and_refine!,
        fill_and_refine_line!,
@@ -18,6 +19,19 @@ function compute_cell_size(cell::Cell)
     r2, z2 = vertices(cell.boundary)[2,2]
     distance = sqrt((r2-r1)^2 + (z2-z1)^2)
     return distance
+end
+
+"Fills a cell with given density and force multiplier information."
+function fill_cell!(density, fm, cell::Cell, wind::WindStruct)
+    n_fill = max(density, cell.data[1])
+    if wind.radiation.include_fm_tauuv
+        fm_fill = max(fm, cell.data[2])
+    else
+        fm_fill = 0.
+    end
+    deltad = compute_cell_size(cell)
+    deltatau = SIGMA_T * wind.bh.R_g * deltad * n_fill
+    cell.data = [n_fill, fm_fill, deltatau]
 end
 
 "Method of the copy function for Cell type"
@@ -74,7 +88,7 @@ function split_cell_initialization(cell, child_indices)
 end
 
 "splits leaf until the max cell optical thickness is reached"
-function refine_leaf!(currentpoint, leaf, n, fm, wind)
+function refine_leaf!(currentpoint, leaf, density, fm, wind)
     optically_thin = false
     while !optically_thin
         optically_thin = true
@@ -84,9 +98,7 @@ function refine_leaf!(currentpoint, leaf, n, fm, wind)
             optically_thin = false
             split!(leaf, split_cell_initialization)
             newleaf = findleaf(leaf, currentpoint)
-            deltad = compute_cell_size(newleaf)
-            deltatau = n * SIGMA_T * wind.bh.R_g * deltad
-            newleaf.data = [n, fm, deltatau]
+            fill_cell!(density, fm, newleaf, wind)
             leaf = newleaf
         end
     end
@@ -98,27 +110,18 @@ function fill_and_refine_linewidth!(point, linewidth, density, fm, wind::WindStr
     rmax = 2 * wind.grids.r_max 
     point1 = [max(point[1] - linewidth / 2., rmin) , point[2]] 
     point2 = [min(point[1] + linewidth / 2., rmax) , point[2]] 
-    sigma_rg = SIGMA_T * wind.bh.R_g
     currentpoint = copy(point1)
     currentleaf = findleaf(wind.quadtree, point1)
     point2leaf = findleaf(wind.quadtree, point2)
-    n_fill = max(density, currentleaf.data[1])
-    fm_fill = max(fm, currentleaf.data[2])
-    deltad = compute_cell_size(currentleaf)
-    deltatau = sigma_rg * deltad * n_fill
-    currentleaf.data = [n_fill, fm_fill, deltatau]
-    refine_leaf!(currentpoint, currentleaf, n_fill, fm_fill, wind)
+    fill_cell!(density, fm, currentleaf, wind)
+    refine_leaf!(currentpoint, currentleaf, density, fm, wind)
     currentleaf = findleaf(wind.quadtree, currentpoint)
     point2leaf = findleaf(wind.quadtree, point2)
     while (currentleaf != point2leaf)
         currentpoint = compute_cell_intersection(currentpoint, currentleaf, point1, point2)
         currentleaf = findleaf(wind.quadtree, currentpoint)
-        n_fill = max(density, currentleaf.data[1])
-        fm_fill = max(fm, currentleaf.data[2])
-        deltad = compute_cell_size(currentleaf)
-        deltatau = sigma_rg * deltad * n_fill
-        currentleaf.data = [n_fill, fm_fill, deltatau]
-        refine_leaf!(currentpoint, currentleaf, n_fill, fm_fill, wind)
+        fill_cell!(density, fm, currentleaf, wind)
+        refine_leaf!(currentpoint, currentleaf, density, fm, wind)
         currentleaf = findleaf(wind.quadtree, currentpoint)
         point2leaf = findleaf(wind.quadtree, point2)
     end
