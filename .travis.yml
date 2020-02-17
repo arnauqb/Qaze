@@ -11,9 +11,8 @@ branches:
   only: master
 
 script:
-  - source ~/virtualenv/python3.7/bin/activate
-  - pip install matplotlib
   - git clone https://github.com/arnauqb/qsosed
-  - cd qsosed && pip install -r requirements.txt && pip install -e .
+  - cd qsosed
+  - julia -e 'using Pkg; Pkg.add("PyCall"); using PyCall; run(`$(PyCall.pyprogramname) -m pip install -r requirements.txt`); run(`$(PyCall.pyprogramname) -m pip install -e .`); run(`$(PyCall.pyprogramname) -m pip install matplotlib`);'
   - cd ..
   - julia -e 'using Pkg; Pkg.add(PackageSpec(url="https://github.com/wildart/TOML.jl.git", rev="master")); Pkg.activate("."); Pkg.test("Qaze", coverage=true);'
