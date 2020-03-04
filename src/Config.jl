@@ -1,15 +1,28 @@
 export initialize
-#ENV["PYCALL_JL_RUNTIME_PYTHON"]="/home/arnau/Documents/qwind/env/bin/python"
 using PyCall
-using RegionTrees: Cell, split!, allleaves
+using RegionTrees
 
 
+"Initialize wind model from config file in TOML format"
 function initialize(config::String)
     config = TOML.parsefile(config)
     initialize(config)
 end
 
+"Initialize wind model from Dictionary"
 function initialize(config::Dict)
+    bh = initialize_blackhole(config)
+    sed = initialize_qsosed(config)
+    grids = initialize_grids(config, sed)
+    radiation = initialize_radiation(config, bh, sed)
+    quadtree = initialize_quadtree(config, bh, grids)
+    wind = initialize_wind(config, bh, sed,grids, quadtree, radiation)
+    initialize_uv_fraction!(wind)
+    initialize_json(config["general"]["save_path"], wind)
+    return wind
+end
+
+function initialize_blackhole(config::Dict)
     M = config["bh"]["M"] 
     mdot =config["bh"]["mdot"]
     spin = config["bh"]["spin"]
@@ -18,9 +31,73 @@ function initialize(config::Dict)
     disk_r_min = config["disk"]["inner_radius"]
     disk_r_max = config["disk"]["outer_radius"]
     bh = BlackHoleStruct(M, mdot, spin, 6., eta, R_g, disk_r_min, disk_r_max)
+    return bh
+end
+
+function initialize_qsosed(config::Dict)
     qsosed = pyimport("qsosed")
-    sed = qsosed.SED(M=M, mdot=mdot, number_bins_fractions=config["grids"]["n_r_disk"])
-    grids = initialize_grids(config, sed)
+    sed = qsosed.SED(
+        M=config["bh"]["M"], 
+        mdot=config["bh"]["mdot"],
+        number_bins_fractions=config["grids"]["n_r_disk"],
+        )
+    return sed
+end
+
+function initialize_grids(config::Dict, qsosed)
+    disk_r_min = config["disk"]["inner_radius"]
+    disk_r_max = config["disk"]["outer_radius"]
+    n_disk = config["grids"]["n_r_disk"]
+    r_min = config["grids"]["r_min"]
+    z_min = config["grids"]["z_min"]
+    r_max = config["grids"]["r_max"]
+    z_max = config["grids"]["z_max"]
+    n_vacuum = config["grids"]["n_vacuum"]
+    n_lines = config["wind"]["number_streamlines"]
+    disk_range = 10 .^(range(log10(disk_r_min), stop=log10(disk_r_max), length=n_disk))
+    grids = GridsStruct(
+        n_disk,
+        n_lines,
+        r_min,
+        r_max,
+        z_min,
+        z_max,
+        disk_range,
+        config["bh"]["mdot"].* ones(Float64, n_disk), #mdot
+        ones(Float64, n_disk), #uv fraction
+        n_vacuum,
+        )
+    return grids
+end
+
+function initialize_radiation(config::Dict, bh::BlackHoleStruct, sed::PyObject)
+    edd_lumin = eddington_luminosity(bh)
+    f_uv = config["radiation"]["f_uv"]
+    f_x = config["radiation"]["f_x"]
+    if (f_uv == "auto" || f_x == "auto")
+        f_uv = sed.uv_fraction
+        f_x = sed.xray_fraction
+    end
+    bol_lumin = bh.mdot * edd_lumin
+    xray_lumin = f_x * bol_lumin
+    force_constant = 3 / (8 * pi * bh.eta)
+    rad = RadiationStruct(bol_lumin, edd_lumin, f_uv, f_x, xray_lumin, force_constant, false, false)
+    return rad
+end
+
+function initialize_quadtree(config::Dict, bh::BlackHoleStruct, grids::GridsStruct)
+    quadtree_max_radius = config["grids"]["r_max"]
+    quadtree_max_height = config["grids"]["z_max"]
+    delta_tau_0 = grids.n_vacuum * sqrt(quadtree_max_height^2 + quadtree_max_radius^2) * bh.R_g * SIGMA_T
+    quadtree = Cell(SVector(0., 0.), 
+                    SVector(2 * quadtree_max_radius, 2* quadtree_max_height),
+                    [grids.n_vacuum, 0., delta_tau_0]
+                    )
+    return quadtree
+end
+
+function initialize_wind(config::Dict, bh::BlackHoleStruct, sed::PyObject, grids::GridsStruct, 
+                         quadtree::Cell, radiation::RadiationStruct)
     n_lines = config["wind"]["number_streamlines"]
     lines_initial_radius = config["wind"]["initial_radius"]
     if lines_initial_radius == "warm_radius"
@@ -38,25 +115,19 @@ function initialize(config::Dict)
         lines_range = [lines_initial_radius + (i+0.5) * dr for i in 0:n_lines-1]
         lines_widths = diff([lines_range ; lines_range[end]])
     end
-    edd_lumin = eddington_luminosity(bh)
-    f_uv = config["radiation"]["f_uv"]
-    f_x = config["radiation"]["f_x"]
-    if (f_uv == "auto" || f_x == "auto")
-        f_uv = sed.uv_fraction
-        f_x = sed.xray_fraction
-    end
-    bol_lumin = bh.mdot * edd_lumin
-    xray_lumin = f_x * bol_lumin
-    force_constant = 3 / (8 * pi * bh.eta)
-    rad = RadiationStruct(bol_lumin, edd_lumin, f_uv, f_x, xray_lumin, force_constant, false, true)
     lines = Array{Any,1}(undef, config["wind"]["number_streamlines"])
-    quadtree_max_radius = config["grids"]["r_max"]
-    quadtree_max_height = config["grids"]["z_max"]
-    delta_tau_0 = grids.n_vacuum * sqrt(quadtree_max_height^2 + quadtree_max_radius^2) * R_g * SIGMA_T
-    quadtree = Cell(SVector(0., 0.), SVector(2 * quadtree_max_radius, 2* quadtree_max_height), [grids.n_vacuum, 0., delta_tau_0])
     z_0 = config["wind"]["z_0"]
-    wind = WindStruct(config, bh, sed, grids, quadtree, rad, lines, lines_initial_radius, lines_range, lines_widths, z_0)
-    initialize_uv_fraction(wind)
-    initialize_json(config["general"]["save_path"], wind)
+    wind = WindStruct(config,
+                      bh,
+                      sed,
+                      grids,
+                      quadtree,
+                      radiation,
+                      lines,
+                      lines_initial_radius,
+                      lines_range,
+                      lines_widths,
+                      z_0,
+                      )
     return wind
 end
