@@ -219,8 +219,8 @@ function force_radiation(r, z, fm, wind::WindStruct ; include_tau_uv = false)
     if (wind.config["wind"]["gravity_only"])
         return [0.,0]
     end
-    if (z < 1.0)
-        return [0.0, force_radiation(r, 1.0, fm, wind, include_tau_uv = include_tau_uv)[2]]
+    if (z < wind.config["radiation"]["constant_frad_height"])
+        return [0.0, force_radiation(r, wind.config["radiation"]["constant_frad_height"], fm, wind, include_tau_uv = include_tau_uv)[2]]
     end
     int_values = integrate(r, z, wind, include_tau_uv=include_tau_uv)
     if wind.config["wind"]["nofm"]

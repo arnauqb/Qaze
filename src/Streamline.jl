@@ -54,7 +54,8 @@ function initialize_line!(line_id, r_0, z_0, v_0, n_0, v_th, wind::WindStruct)
     saved_values_type = SavedValues(Float64, Array{Float64,1})
     saving_cb = SavingCallback(save, saved_values_type)
     steadystate_cb = TerminateSteadyState(1e-8, 1e-6) 
-    cb = CallbackSet(termination_cb, saving_cb, steadystate_cb)
+    #cb = CallbackSet(termination_cb, saving_cb, steadystate_cb)
+    cb = CallbackSet(termination_cb, saving_cb)
     problem = DAEProblem(residual!, du0, u0, tspan, p=line, differential_vars=[true, true, true, true])
     integrator = init(problem, IDA(), callback=cb)#, dtmax=5e-2 * wind.bh.R_g / C)
     integrator.opts.abstol = 0.
@@ -146,7 +147,7 @@ function condition(u, t, integrator)
     #    end
     #end
     escaped_condition = (r >= integrator.p.wind.grids.r_max) || (z >= integrator.p.wind.grids.z_max)
-    escaped_condition && (integrator.p.outofdomain=true)
+    #escaped_condition && (integrator.p.outofdomain=true)
     failed_condtion = z < integrator.p.z_0  || r < 0.
     cond = escaped_condition | failed_condtion | crossing_condition 
     return cond
