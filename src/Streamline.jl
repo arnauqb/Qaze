@@ -130,7 +130,7 @@ function condition(u, t, integrator)
     v_esc = sqrt(2. / d)
     v_T > v_esc && (integrator.p.escaped=true)
     crossing_condition = false
-    if r < integrator.p.r_0 - 1
+    if r < integrator.p.r_0# - 1
         integrator.p.crossing_counter += 1
         if integrator.p.crossing_counter >= 10
             crossing_condition = true

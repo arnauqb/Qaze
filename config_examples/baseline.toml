@@ -1,7 +1,7 @@
 title = "Qwind config file"
 
 [general]
-save_path = "baseline.json"
+save_path = "cak_logs.json"
 verbosity = 0
 
 [bh]
@@ -23,7 +23,7 @@ z_max = 10000.0
 n_r_disk = 1001
 n_vacuum = 1e2
 tree_initial_divisions = 2
-cell_optical_thickness = 0.1
+cell_optical_thickness = 0.2
 
 [radiation]
 f_uv = "auto" 
@@ -34,7 +34,7 @@ tau_uv_geometry = "disk"
 disk_uv_fraction = true 
 no_tau_uv = false
 no_tau_uv_z = false 
-tau_uv_include_fm = true
+tau_uv_include_fm = false
 constant_frad_height = 1.0
 
 [wind]
@@ -42,10 +42,10 @@ initial_radius = "warm_radius"
 final_radius = 2000.0
 number_streamlines = 60
 iterations = 5
-log_spaced = false
-wind_temperature = "disk"
+log_spaced = true
+wind_temperature = 2.5e4 
 initial_conditions = "manual"
-n_0 = 1e9
+n_0 = "cak"
 v_0 = "thermal"
 z_0 = 0.0
 solver_rtol = 1e-2
