@@ -91,7 +91,7 @@ function initialize_quadtree(config::Dict, bh::BlackHoleStruct, grids::GridsStru
     delta_tau_0 = grids.n_vacuum * sqrt(quadtree_max_height^2 + quadtree_max_radius^2) * bh.R_g * SIGMA_T
     quadtree = Cell(SVector(0., 0.), 
                     SVector(2 * quadtree_max_radius, 2* quadtree_max_height),
-                    [grids.n_vacuum, 0., delta_tau_0]
+                    [grids.n_vacuum, 0., delta_tau_0, []] # density, fm , cell optical thickness, lines that pass through this cell
                     )
     return quadtree
 end

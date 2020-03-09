@@ -30,8 +30,14 @@ function start_line!(line_id, r_0, wind::WindStruct)
     return line
 end
 
-function start_iteration!(it_num, wind::WindStruct)
+function start_iteration!(it_num, until_line, wind::WindStruct)
+    if until_line === nothing
+        until_line = wind.config["wind"]["number_streamlines"]
+    end
     for (i, r_0) in enumerate(wind.lines_range)
+        if i > until_line
+            break
+        end
         if it_num > 1
             erase_line_from_tree!(i, wind)
         end
@@ -40,7 +46,7 @@ function start_iteration!(it_num, wind::WindStruct)
     end
 end
 
-function start_lines!(wind::WindStruct)
+function start_lines!(wind::WindStruct, until_line = nothing)
     wind.radiation.include_tauuv = false
     for it_num in 1:wind.config["wind"]["iterations"]
         @printf("Iteration %02d of %02d\n", it_num, wind.config["wind"]["iterations"])
@@ -50,7 +56,7 @@ function start_lines!(wind::WindStruct)
             wind.radiation.include_tauuv = true
             wind.config["radiation"]["tau_uv_include_fm"] && (wind.radiation.include_fm_tauuv = true)
         end
-        start_iteration!(it_num, wind)
+        start_iteration!(it_num, until_line, wind)
         #refine_all(wind)
         write_properties_and_grids(wind.config["general"]["save_path"], wind, it_num)
     end

@@ -23,7 +23,7 @@ function initialize_line!(line_id, r_0, z_0, v_0, n_0, v_th, wind::WindStruct)
     l = v_phi_0 * r_0 # initial angular momentum
     lw0 = wind.lines_widths[line_id]
     linewidth_normalized = lw0 / r_0
-    fill_and_refine!([r_0, z_0], [r_0, z_0], linewidth_normalized, n_0, 0., wind) # fill first point
+    fill_and_refine!([r_0, z_0], [r_0, z_0], linewidth_normalized, n_0, 0., line_id, wind) # fill first point
     a_r_0, a_z_0, fm, xi, dv_dr, tau_x = compute_initial_acceleration(r_0, z_0, v_0, n_0, v_th, l, wind)
     u0 = [r_0, z_0, 0., v_0]
     du0 = [0., v_0, a_r_0, a_z_0]
@@ -131,12 +131,15 @@ function condition(u, t, integrator)
     v_esc = sqrt(2. / d)
     v_T > v_esc && (integrator.p.escaped=true)
     crossing_condition = false
-    if r < integrator.p.r_0# - 1
-        integrator.p.crossing_counter += 1
-        if integrator.p.crossing_counter >= 10
-            crossing_condition = true
-        end
+    if (r < integrator.p.r_0) && (z < maximum(integrator.p.u_hist[:,2]))
+        crossing_condition = true
     end
+    #if r < integrator.p.r_0# - 1
+    #    integrator.p.crossing_counter += 1
+    #    if integrator.p.crossing_counter >= 10
+    #        crossing_condition = true
+    #    end
+    #end
 
     #stalling_condition = false
     #z_hist = integrator.p.u_hist[:,2]
@@ -146,10 +149,14 @@ function condition(u, t, integrator)
     #        stalling_condition = true
     #    end
     #end
+    stalling_condition = false
+    #if length(integrator.p.u_hist) > 500
+    #    stalling_condition = true
+    #end
     escaped_condition = (r >= integrator.p.wind.grids.r_max) || (z >= integrator.p.wind.grids.z_max)
     #escaped_condition && (integrator.p.outofdomain=true)
-    failed_condtion = z < integrator.p.z_0  || r < 0.
-    cond = escaped_condition | failed_condtion | crossing_condition 
+    failed_condtion = ((z <  1e-2) && (v_z < 0)) || r < 0.
+    cond = escaped_condition | failed_condtion | crossing_condition  | stalling_condition
     return cond
 end
 
@@ -185,7 +192,7 @@ function save(u, t, integrator)
     linewidth_normalized = integrator.p.line_width / integrator.p.r_0 
     currentpoint = [r, z]
     previouspoint = [r_0, z_0]
-    fill_and_refine!(previouspoint, currentpoint, linewidth_normalized, n, fm, integrator.p.wind)
+    fill_and_refine!(previouspoint, currentpoint, linewidth_normalized, n, fm, integrator.p.line_id, integrator.p.wind)
     integrator.p.u_hist = [integrator.p.u_hist ; transpose(u)]
     push!(integrator.p.fm_hist, fm)
     push!(integrator.p.n_hist, n)

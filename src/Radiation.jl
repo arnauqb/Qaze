@@ -1,3 +1,4 @@
+using Roots
 export thermal_velocity,
        eddington_luminosity,
        initialize_uv_fraction!,
@@ -9,6 +10,8 @@ export thermal_velocity,
        ionization_parameter,
        compute_tau_eff,
        force_multiplier,
+       force_multiplier_k,
+       force_multiplier_eta,
        force_radiation
 
 function thermal_velocity(T, mu = 1.)
@@ -95,17 +98,19 @@ Computes the variation of optical depth inside a tree leaf.
 We iterate multiple times to compute a consistent ionization parameter
 and X-Ray optical depth
 """
-function compute_taux_leaf(point, intersection, leaf, wind::WindStruct)
+function compute_taux_leaf(point, intersection, taux0, leaf, wind::WindStruct)
     deltad = distance2d(point, intersection) * wind.bh.R_g # cell size
-    d = distance2d([0.,wind.z_0], point) * wind.bh.R_g # distance from the center
+    d = distance2d([0.,wind.z_0], intersection) * wind.bh.R_g # distance from the center
     density = leaf.data[1]
     xi0 = wind.radiation.xray_luminosity / (density * d^2)
-    taux = 0.
-    xi = xi0
-    for i = 1:2 
-        taux = density * opacity_x(xi) * deltad * SIGMA_T
-        xi = xi0 * exp(-taux)
-    end
+    #xi = xi0
+    #for i = 1:2 
+    #    taux = density * opacity_x(xi) * deltad * SIGMA_T
+    #    xi = xi0 * exp(-taux)
+    #end
+    #taux = density * opacity_x(xi) * deltad * SIGMA_T
+    f(t) = t - log(xi0) - taux0 - deltad * density * opacity_x(exp(t)) * SIGMA_T
+    xi = exp(find_zero(f, -5, atol=0.1))
     taux = density * opacity_x(xi) * deltad * SIGMA_T
     return taux
 end
@@ -124,24 +129,25 @@ function compute_tau_x(r, z, wind::WindStruct ; return_coords = false)
     point1leaf = findleaf(wind.quadtree, point1)
     point2 = [r,z]
     point2leaf = findleaf(wind.quadtree, point2)
+    taux = 0.0
     if point1leaf == point2leaf
         push!(coords_list, point2)
-        taux = compute_taux_leaf(point1, point2, point1leaf, wind)
+        taux = compute_taux_leaf(point1, point2, 0.0, point1leaf, wind)
         return taux
     end
     intersection = compute_cell_intersection(point1, point1leaf, point1, point2)
-    taux = compute_taux_leaf(point1, intersection, point1leaf, wind)
+    taux = compute_taux_leaf(point1, intersection, taux, point1leaf, wind)
     currentpoint = intersection
     push!(coords_list, intersection)
     currentleaf = findleaf(wind.quadtree, currentpoint)
     while currentleaf != point2leaf
         intersection = compute_cell_intersection(currentpoint, currentleaf, point1, point2)
         push!(coords_list, intersection)
-        taux += compute_taux_leaf(currentpoint, intersection, currentleaf, wind)
+        taux += compute_taux_leaf(currentpoint, intersection, taux, currentleaf, wind)
         currentpoint = intersection
         currentleaf = findleaf(wind.quadtree, currentpoint)
     end
-    taux += compute_taux_leaf(currentpoint, point2, currentleaf, wind)
+    taux += compute_taux_leaf(currentpoint, point2, taux, currentleaf, wind)
     push!(coords_list, point2)
     if return_coords
         return taux, coords_list

@@ -1,71 +1,44 @@
-using Roots
-export cak_density, cak_z0, cak_z0_aux, local_eddington_ratio, radiation_pressure, gas_pressure, cak_mdot
+using Roots, Optim
+const ALPHA = 0.6
+export cak_surface_mloss, cak_density 
 
-function radiation_pressure(z, r, wind::WindStruct)
-    #T_rad = SS_temperature(r, wind.bh)
-    T_rad = wind.sed.disk_nt_temperature4(r)^(0.25)
-    rad_pressure = (SIGMA_T * SIGMA_SB) / (M_P * C) * T_rad^4
-    return rad_pressure
+"Nozzle function defined in Pereyra et al. (2004) (Paper I)"
+function cak_nozzle_function(z, r_0, wind::WindStruct)
+    x = z[1] / r_0
+    T = wind.sed.disk_nt_temperature4(r_0)^(1/4) #SS_temperature(r_0, wind.bh)
+    b = thermal_velocity(25e3) * C
+    M = wind.bh.M * M_SUN
+    R0 = r_0 * wind.bh.R_g
+    numerator = (1 + x^2)^(1 / ALPHA)
+    denom_1 = x / (1+x^2)^(3/2)
+    denom_2 = - SIGMA_E * SIGMA_SB * T^4 / (G * M * C) * R0^2
+    denom_3 = - 4 * b^2 * R0 * x / (G * M)
+    denom = (denom_1 + denom_2 + denom_3)^((1-ALPHA) / ALPHA)
+    return numerator / denom
 end
 
-function gas_pressure(z, r, wind::WindStruct)
-    T_gas = wind.sed.disk_core_temperature(r) 
-    cs2 = K_B * T_gas  / (wind.config["disk"]["mu"] * M_P) 
-    gas_pressure = cs2 / (z * wind.bh.R_g)
+function cak_characteristic_mloss(r_0, wind::WindStruct, K=0.03)
+    T = wind.sed.disk_nt_temperature4(r_0)^(1/4) #SS_temperature(r_0, wind.bh)
+    b = thermal_velocity(25e3) * C
+    M = wind.bh.M * M_SUN
+    R0 = r_0 * wind.bh.R_g
+    constant = ALPHA * (1-ALPHA)^((1-ALPHA)/ALPHA) / (b * SIGMA_E)
+    term_1 = G * M / R0^2
+    term_2 = (SIGMA_E * SIGMA_SB * T^4 * K * R0^2 / (C * G * M))^(1/ALPHA)
+    return constant * term_1 * term_2
 end
 
-function cak_z0_aux(z, r, wind::WindStruct)
-    gravity_z = gravity_cgs(r, z, wind.bh)[2]
-    return gravity_z + radiation_pressure(z, r, wind) + gas_pressure(z,r,wind)
+function cak_surface_mloss(r_0, wind::WindStruct, K=0.03)
+    f(z) = cak_nozzle_function(z, r_0, wind)
+    mdot = optimize(f, 0, 2 * r_0, Brent()).minimum
+    Sigma = cak_characteristic_mloss(r_0, wind, K) * mdot
+    return Sigma
 end
 
-function local_eddington_ratio(r, z, wind::WindStruct)
-    gravity_z = gravity_cgs(r, z, wind.bh)[2]
-    return radiation_pressure(z, r, wind) / abs(gravity_z)
+function cak_density(r_0, wind::WindStruct)
+    K = wind.config["radiation"]["cak_K"]
+    Sigma = cak_surface_mloss(r_0, wind, K)
+    T = wind.sed.disk_nt_temperature4(r_0)^(1/4) #SS_temperature(r_0, wind.bh)
+    b = thermal_velocity(T) * C
+    return Sigma / b / M_P
 end
-
-function cak_z0(r, wind::WindStruct)
-    #z0 = find_zero(z->cak_z0_aux(z, r, wind), 50., ) 
-    z0 = minimum(find_zeros(z->cak_z0_aux(z, r, wind), 0, 100))
-    try
-        @assert z0 > 0
-    catch
-        println("CAK z0 unphyiscal")
-        println(r)
-        println(z0)
-        throw(DomainError)
-    end
-    return z0
-end
-
-"Mass loss rate from Pereyra 2015"
-function cak_mdot(r, wind::WindStruct)
-    ALPHA = 0.6
-    #K = 0.003
-    K = 0.03
-    T = SS_temperature(r, wind.bh)
-    vth = thermal_velocity(T) * C
-    z0 = 3 * SIGMA_T / M_P * mass_accretion_rate(wind.bh) / (8 * π * C)
-    factor1 = G * wind.bh.M * M_SUN * z0 / (SIGMA_T / M_P * vth * r^3 * wind.bh.R_g^3)
-    fmfactor = ALPHA * (1-ALPHA)^((1.0-ALPHA)/ALPHA) * K^(1/ALPHA)
-    mdot = factor1 * fmfactor
-    return mdot
-end
-
-function cak_density(r, wind::WindStruct)
-    mdot = cak_mdot(r, wind)
-    v_th = thermal_velocity(SS_temperature(r, wind.bh)) * C
-    n =   mdot / v_th / (wind.config["disk"]["mu"] * M_P) 
-    try
-        @assert n >= 0
-    catch
-        println(mdot)
-        println(v_th)
-        println(wind.config["disk"]["mu"])
-        throw(DomainError)
-    end
-    return n
-end
-
-# Kure model
-
