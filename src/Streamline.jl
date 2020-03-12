@@ -23,7 +23,7 @@ function initialize_line!(line_id, r_0, z_0, v_0, n_0, v_th, wind::WindStruct)
     l = v_phi_0 * r_0 # initial angular momentum
     lw0 = wind.lines_widths[line_id]
     linewidth_normalized = lw0 / r_0
-    fill_and_refine!([r_0, z_0], [r_0, z_0], linewidth_normalized, n_0, 0., line_id, wind) # fill first point
+    #fill_and_refine!([r_0, z_0], [r_0, z_0], linewidth_normalized, n_0, 0., line_id, wind) # fill first point
     a_r_0, a_z_0, fm, xi, dv_dr, tau_x = compute_initial_acceleration(r_0, z_0, v_0, n_0, v_th, l, wind)
     u0 = [r_0, z_0, 0., v_0]
     du0 = [0., v_0, a_r_0, a_z_0]
@@ -55,10 +55,11 @@ function initialize_line!(line_id, r_0, z_0, v_0, n_0, v_th, wind::WindStruct)
     saving_cb = SavingCallback(save, saved_values_type)
     steadystate_cb = TerminateSteadyState(1e-8, 1e-6) 
     #cb = CallbackSet(termination_cb, saving_cb, steadystate_cb)
+    #cbtol = AutoAbstol(init_curmax=0.0)
     cb = CallbackSet(termination_cb, saving_cb)
     problem = DAEProblem(residual!, du0, u0, tspan, p=line, differential_vars=[true, true, true, true])
     integrator = init(problem, IDA(), callback=cb)#, dtmax=5e-2 * wind.bh.R_g / C)
-    integrator.opts.abstol = 0.
+    integrator.opts.abstol = 0 # [1e-5, 1e-5, 1e-8, 1e-8]
     integrator.opts.reltol = wind.config["wind"]["solver_rtol"]
     return integrator
 end
@@ -90,6 +91,8 @@ end
 
 "Residual function of the implict diffeq system"
 function residual!(resid, du, u, line, t)
+    #println("residual")
+    #flush(stdout)
     r, z, v_r, v_z = u
     r_dot, z_dot, v_r_dot, v_z_dot = du
     if z < 0 || r < 0 # if integrator tries outside domain, switch off radiation
@@ -108,7 +111,8 @@ function residual!(resid, du, u, line, t)
     a_T = sqrt(v_r_dot^2 + v_z_dot^2)
     dv_dr = a_T / v_T
     n = compute_density(r, z, v_T, line)
-    tau_x = compute_tau_x(r, z, line.wind)
+    println("taux")
+    @time tau_x = compute_tau_x(r, z, line.wind)
     xi = ionization_parameter(r, z, n, tau_x, line.wind)
     tau_eff = compute_tau_eff(n, dv_dr, line.v_th)
     fm = force_multiplier(tau_eff, xi)
@@ -131,7 +135,7 @@ function condition(u, t, integrator)
     v_esc = sqrt(2. / d)
     v_T > v_esc && (integrator.p.escaped=true)
     crossing_condition = false
-    if (r < integrator.p.r_0) && (z < maximum(integrator.p.u_hist[:,2]))
+    if (r < integrator.p.r_0) && (z < 0.2 * maximum(integrator.p.u_hist[:,2]))
         crossing_condition = true
     end
     #if r < integrator.p.r_0# - 1
@@ -150,12 +154,12 @@ function condition(u, t, integrator)
     #    end
     #end
     stalling_condition = false
-    #if length(integrator.p.u_hist) > 500
-    #    stalling_condition = true
-    #end
+    if (z < 0.2 * maximum(integrator.p.u_hist[:,2])) && (length(integrator.p.u_hist) > 500) || (length(integrator.p.u_hist) > 5000 )
+        stalling_condition = true
+    end
     escaped_condition = (r >= integrator.p.wind.grids.r_max) || (z >= integrator.p.wind.grids.z_max)
     #escaped_condition && (integrator.p.outofdomain=true)
-    failed_condtion = ((z <  1e-2) && (v_z < 0)) || r < 0.
+    failed_condtion = ((z <  integrator.p.wind.z_0) && (v_z < 0)) || r < 0.
     cond = escaped_condition | failed_condtion | crossing_condition  | stalling_condition
     return cond
 end
@@ -173,6 +177,8 @@ end
 
 "Saves current iteration data"
 function save(u, t, integrator)
+    #println("save")
+    #println("=======")
     r, z, v_r, v_z = u
     if any([r,z] .< 0)
         terminate!(integrator)
@@ -192,7 +198,9 @@ function save(u, t, integrator)
     linewidth_normalized = integrator.p.line_width / integrator.p.r_0 
     currentpoint = [r, z]
     previouspoint = [r_0, z_0]
-    fill_and_refine!(previouspoint, currentpoint, linewidth_normalized, n, fm, integrator.p.line_id, integrator.p.wind)
+    println("filling ")
+    @time fill_and_refine!(previouspoint, currentpoint, linewidth_normalized, n, fm, integrator.p.line_id, integrator.p.wind)
+    println("------------------")
     integrator.p.u_hist = [integrator.p.u_hist ; transpose(u)]
     push!(integrator.p.fm_hist, fm)
     push!(integrator.p.n_hist, n)

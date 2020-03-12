@@ -1,6 +1,6 @@
 using Roots, Optim
 const ALPHA = 0.6
-export cak_surface_mloss, cak_density 
+export cak_surface_mloss, cak_density, cak_normalized_mdot, cak_characteristic_mloss
 
 "Nozzle function defined in Pereyra et al. (2004) (Paper I)"
 function cak_nozzle_function(z, r_0, wind::WindStruct)
@@ -26,6 +26,12 @@ function cak_characteristic_mloss(r_0, wind::WindStruct, K=0.03)
     term_1 = G * M / R0^2
     term_2 = (SIGMA_E * SIGMA_SB * T^4 * K * R0^2 / (C * G * M))^(1/ALPHA)
     return constant * term_1 * term_2
+end
+
+function cak_normalized_mdot(r_0, wind::WindStruct)
+    f(z) = cak_nozzle_function(z, r_0, wind)
+    mdot = optimize(f, 0, 2 * r_0, Brent()).minimum
+    return mdot
 end
 
 function cak_surface_mloss(r_0, wind::WindStruct, K=0.03)

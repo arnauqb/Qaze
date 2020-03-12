@@ -4,7 +4,9 @@ using RegionTrees
 import Base: copy, ==
 export copy,
        compute_cell_intersection,
-       compute_cell_size,
+       split_cell_initialization,
+       cell_size,
+       cell_width,
        refine_leaf!,
        fill_cell!,
        fill_and_refine_leaf!,
@@ -16,24 +18,20 @@ export copy,
        reinitialize_tree!
 
 "Computes the diagonal of the cell"
-function compute_cell_size(cell::Cell)
-    r1, z1 = vertices(cell.boundary)[1,1]
-    r2, z2 = vertices(cell.boundary)[2,2]
-    distance = sqrt((r2-r1)^2 + (z2-z1)^2)
-    return distance
+function cell_size(cell::Cell)
+    return sqrt(2) * cell_width(cell) 
+end
+
+function cell_width(cell::Cell)
+    return cell.boundary.widths[1]
 end
 
 "Fills a cell with given density and force multiplier information."
 function fill_cell!(density, fm, line_id, cell::Cell, wind::WindStruct)
-    n_fill = max(density, cell.data[1])
-    if wind.radiation.include_fm_tauuv
-        fm_fill = max(fm, cell.data[2])
-    else
-        fm_fill = 0.
-    end
-    deltad = compute_cell_size(cell)
+    n_fill = density #max(density, cell.data[1])
+    deltad = cell_size(cell)
     deltatau = SIGMA_T * wind.bh.R_g * deltad * n_fill
-    cell.data = [n_fill, fm_fill, deltatau, []]
+    cell.data = [n_fill, deltatau]
     #if line_id in cell.data[4]
     #    cell.data = [n_fill, fm_fill, deltatau, cell.data[4]]
     #else
@@ -73,7 +71,7 @@ function reinitialize_tree!(wind::WindStruct)
     quadtree_max_height = wind.config["grids"]["z_max"]
     n_vacuum = wind.grids.n_vacuum
     delta_tau_0 = n_vacuum * sqrt(quadtree_max_height^2 + quadtree_max_radius^2) * wind.bh.R_g * SIGMA_T
-    wind.quadtree = Cell(SVector(0., 0.), SVector(2 * quadtree_max_radius, 2* quadtree_max_height), [n_vacuum, 0., delta_tau_0, []])
+    wind.quadtree = Cell(SVector(0., 0.), SVector(2 * quadtree_max_radius, 2* quadtree_max_height), [n_vacuum, 0.,])
 end
 
 "Following the line initialpoint -> finalpoint, computes the intersection after the current point
@@ -105,7 +103,7 @@ end
 
 "Initializes cell data after split"
 function split_cell_initialization(cell, child_indices)
-    newdata = [cell.data[1], 0., cell.data[3] / 2.0, []]
+    newdata = [1e2, 1e2 * cell_size(cell)]
     return newdata
 end
 
@@ -129,16 +127,16 @@ function refine_leaf!(currentpoint, leaf, density, fm, line_id, wind)
 end
 
 function fill_and_refine_leaf!(currentpoint, leaf, density, fm, wind)
-    deltatau = SIGMA_T * wind.bh.R_g * density * compute_cell_size(leaf) 
+    deltatau = SIGMA_T * wind.bh.R_g * density * cell_size(leaf) 
     thicknessmax = wind.config["grids"]["cell_optical_thickness"]
     mincellsize = wind.config["grids"]["minimum_cell_size"] 
-    refine_condition = (deltatau > thicknessmax) && (compute_cell_size(leaf) > mincellsize)
+    refine_condition = (deltatau > thicknessmax) && (cell_size(leaf) > mincellsize)
     if refine_condition
         N = ceil(log2(deltatau / thicknessmax))
         for i = 1:N
             split!(leaf, split_cell_initialization)
             leaf = findleaf(leaf, currentpoint)
-            if compute_cell_size(leaf) < mincellsize
+            if cell_size(leaf) < mincellsize
                 break
             end
         end
@@ -148,26 +146,62 @@ function fill_and_refine_leaf!(currentpoint, leaf, density, fm, wind)
 end
 
 "Fills the line data to all leaves along the width of the streamline at point, and refines them if necessary"
-function fill_and_refine_linewidth!(point, linewidth, density, fm, line_id, wind::WindStruct)
+function fill_and_refine_linewidth!(point, height, linewidth, density, fm, line_id, wind::WindStruct)
+    (height == 0) && (return nothing)
     rmin = 0.0
     rmax = 2 * wind.grids.r_max 
     point1 = [max(point[1] - linewidth / 2., rmin) , point[2]] 
     point2 = [min(point[1] + linewidth / 2., rmax) , point[2]] 
     currentpoint = copy(point1)
     currentleaf = findleaf(wind.quadtree, point1)
+    point1leaf = copy(currentleaf)
     point2leaf = findleaf(wind.quadtree, point2)
-    #fill_cell!(density, fm, line_id, currentleaf, wind)
-    #refine_leaf!(currentpoint, currentleaf, density, fm, line_id, wind)
-    fill_and_refine_leaf!(currentpoint, currentleaf, density, fm, wind)
-    currentleaf = findleaf(wind.quadtree, currentpoint)
-    point2leaf = findleaf(wind.quadtree, point2)
+    #deltad = 0.1 / (wind.bh.R_g * SIGMA_T * density) 
+    height = max(height, 0.1)
+    if point[1] < 50.
+        height = min(height, linewidth / 2.)
+    end
+    N = floor(log2(cell_size(currentleaf) / height))
+    while N > 0
+        split!(currentleaf, split_cell_initialization)
+        currentleaf = findleaf(currentleaf, currentpoint)
+        N -= 1
+    end
+    maxsize = cell_size(currentleaf)
+    maxheight = vertices(currentleaf)[1,2][2]
+    fill_cell!(density, fm, line_id, currentleaf, wind)
+    point2leaf = findleaf(point2leaf, point2)
+    if currentleaf == point2leaf
+        return nothing
+    end
     while (currentleaf != point2leaf)
+        previousleaf = copy(currentleaf)
         currentpoint = compute_cell_intersection(currentpoint, currentleaf, point1, point2)
         currentleaf = findleaf(wind.quadtree, currentpoint)
-        #fill_cell!(density, fm, line_id, currentleaf, wind)
-        #refine_leaf!(currentpoint, currentleaf, density, fm, line_id, wind)
-        fill_and_refine_leaf!(currentpoint, currentleaf, density, fm, wind)
-        currentleaf = findleaf(wind.quadtree, currentpoint)
+        leaf_size = cell_size(currentleaf)
+        if leaf_size > maxsize
+            N = ceil(log2(cell_size(currentleaf) / maxsize))
+            while N > 0
+                split!(currentleaf, split_cell_initialization)
+                currentleaf = findleaf(currentleaf, currentpoint)
+                N -= 1
+            end
+            fill_cell!(density, fm, line_id, currentleaf, wind)
+        else
+            sizefold = log2(maxsize / leaf_size )
+            @assert sizefold == Int(sizefold)
+            cpoint = copy(currentpoint)
+            cpleaf = copy(currentleaf)
+            fill_cell!(density, fm, line_id, cpleaf, wind)
+            for i in 1:sizefold
+                previousleaf = copy(cpleaf)
+                cpoint = compute_cell_intersection(cpoint, cpleaf, currentpoint, [currentpoint[1], maxheight])
+                cpleaf = findleaf(wind.quadtree, cpoint)
+                fill_cell!(density, fm, line_id, cpleaf, wind)
+            end
+            currentleaf = findleaf(currentleaf, currentpoint)
+            fill_cell!(density, fm, line_id, currentleaf, wind)
+        end
         point2leaf = findleaf(wind.quadtree, point2)
     end
 end
@@ -180,7 +214,7 @@ function fill_and_refine!(point1, point2, linewidth_normalized, n, fm, line_id, 
     currentleaf = copy(point1leaf)
     previousleaf = copy(currentleaf)
     point2leaf = findleaf(wind.quadtree, point2)
-    fill_and_refine_linewidth!(currentpoint, lw, n, fm, line_id, wind)
+    fill_and_refine_linewidth!(currentpoint, abs(point1[2] - point2[2]), lw, n, fm, line_id, wind)
     currentleaf = findleaf(wind.quadtree, currentpoint)
     point2leaf = findleaf(wind.quadtree, point2)
     while(currentleaf != point2leaf)
@@ -200,7 +234,7 @@ function fill_and_refine!(point1, point2, linewidth_normalized, n, fm, line_id, 
             currentpoint .-= 1e-8
             currentleaf = findleaf(wind.quadtree, currentpoint)
         end
-        fill_and_refine_linewidth!(currentpoint, lw, n, fm, line_id, wind)
+        fill_and_refine_linewidth!(currentpoint, abs(point1[2] - point2[2]), lw, n, fm, line_id, wind)
         currentleaf = findleaf(wind.quadtree, currentpoint)
         point2leaf = findleaf(wind.quadtree, point2)
         previousleaf = copy(currentleaf) 
@@ -230,16 +264,17 @@ end
 
 "Erases line density and fm from tree, setting the values to the initial ones."
 function erase_line_from_tree!(line_id, wind::WindStruct)
-    reinitialize_tree!(wind)
+    #reinitialize_tree!(wind)
     line = wind.lines[line_id]
     n_vacuum = wind.grids.n_vacuum
     line.p.n_hist .= n_vacuum * ones(Float64, size(line.p.n_hist))
     line.p.fm_hist .= zeros(Float64, size(line.p.fm_hist))
-    for i in 1:length(wind.lines)
-        isassigned(wind.lines, i) || continue
-        (i == line_id) && continue
-        line = wind.lines[i]
-        fill_and_refine_line!(line, i, wind)
-    end
+    fill_and_refine_line!(line, line_id, wind)
+    #for i in 1:length(wind.lines)
+    #    isassigned(wind.lines, i) || continue
+    #    (i == line_id) && continue
+    #    line = wind.lines[i]
+    #    fill_and_refine_line!(line, i, wind)
+    #end
     #fill_and_refine_all_lines!(wind)
 end

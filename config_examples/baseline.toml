@@ -1,7 +1,7 @@
 title = "Qwind config file"
 
 [general]
-save_path = "cak_lowsize.json"
+save_path = "tests.json"
 verbosity = 0
 
 [bh]
@@ -12,7 +12,7 @@ eta = 0.057
 
 [disk]
 inner_radius = 6.0
-outer_radius = 1600.0
+outer_radius = 1200.0
 mu = 1.0
 
 [grids]
@@ -20,7 +20,7 @@ r_min = 0.0
 z_min = 0.0
 r_max = 10000.0
 z_max = 10000.0
-n_r_disk = 1001
+n_r_disk = 1000
 n_vacuum = 1e2
 tree_initial_divisions = 2
 cell_optical_thickness = 0.1
@@ -36,21 +36,21 @@ disk_uv_fraction = true
 no_tau_uv = false
 no_tau_uv_z = false 
 tau_uv_include_fm = false
-constant_frad_height = 1.0
+constant_frad_height = 0.1
 cak_K = 0.3
 
 [wind]
 initial_radius = "warm_radius"
-final_radius = 1000.0
+final_radius = 1200.0
 number_streamlines = 60
-iterations = 1
-log_spaced = true
+iterations = 4
+log_spaced = true 
 wind_temperature = 2.5e4 
 initial_conditions = "manual"
-n_0 = 1e9 #"cak"
+n_0 = "cak"
 v_0 = "thermal"
 z_0 = 0.0
-solver_rtol = 1e-3
+solver_rtol = 1e-2
 gravity_only = false 
 nofm = false
 consistent_mdot = false

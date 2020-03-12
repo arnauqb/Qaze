@@ -110,7 +110,7 @@ function compute_taux_leaf(point, intersection, taux0, leaf, wind::WindStruct)
     #end
     #taux = density * opacity_x(xi) * deltad * SIGMA_T
     f(t) = t - log(xi0) - taux0 - deltad * density * opacity_x(exp(t)) * SIGMA_T
-    xi = exp(find_zero(f, -5, atol=0.1))
+    xi = exp(find_zero(f, -5, atol=1))
     taux = density * opacity_x(xi) * deltad * SIGMA_T
     return taux
 end
@@ -121,39 +121,43 @@ Starting from the center, we compute the intersection to the next cell,
 following the lightray direction (0,0) -> (r,z). At each cell,
 we consistently compute tau_x and the ionization parameter.
 """
-function compute_tau_x(r, z, wind::WindStruct ; return_coords = false)
+function compute_tau_x(r, z, wind::WindStruct)
     z = max(z, wind.z_0)
     @assert z >= 0
     point1 = [0.0, wind.z_0]
-    coords_list = [point1]
+    #coords_list = [point1]
     point1leaf = findleaf(wind.quadtree, point1)
     point2 = [r,z]
     point2leaf = findleaf(wind.quadtree, point2)
     taux = 0.0
     if point1leaf == point2leaf
-        push!(coords_list, point2)
+        #push!(coords_list, point2)
         taux = compute_taux_leaf(point1, point2, 0.0, point1leaf, wind)
         return taux
     end
     intersection = compute_cell_intersection(point1, point1leaf, point1, point2)
     taux = compute_taux_leaf(point1, intersection, taux, point1leaf, wind)
     currentpoint = intersection
-    push!(coords_list, intersection)
+    #push!(coords_list, intersection)
     currentleaf = findleaf(wind.quadtree, currentpoint)
     while currentleaf != point2leaf
         intersection = compute_cell_intersection(currentpoint, currentleaf, point1, point2)
-        push!(coords_list, intersection)
+        #push!(coords_list, intersection)
         taux += compute_taux_leaf(currentpoint, intersection, taux, currentleaf, wind)
+        if taux > 40
+            return 40.0
+        end
         currentpoint = intersection
         currentleaf = findleaf(wind.quadtree, currentpoint)
     end
     taux += compute_taux_leaf(currentpoint, point2, taux, currentleaf, wind)
-    push!(coords_list, point2)
-    if return_coords
-        return taux, coords_list
-    else
-        return taux
-    end
+    return taux
+    #push!(coords_list, point2)
+    #if return_coords
+    #    return taux, coords_list
+    #else
+    #    return taux
+    #end
 end
 
 "Computes the ionization parameter at a point (r,z)"
@@ -222,13 +226,29 @@ of the UV flux along the disc annuli-gas patch los.
 function force_radiation(r, z, fm, wind::WindStruct ; include_tau_uv = false)
     @assert r >= 0
     @assert z >= 0
-    if (wind.config["wind"]["gravity_only"])
+    if (wind.config["wind"]["gravity_only"] || z <= 0.0)
         return [0.,0]
     end
-    if (z < wind.config["radiation"]["constant_frad_height"])
-        return [0.0, force_radiation(r, wind.config["radiation"]["constant_frad_height"], fm, wind, include_tau_uv = include_tau_uv)[2]]
+    #if (z < wind.config["radiation"]["constant_frad_height"])
+    #if (z < 1e-3 * r)
+    if (r > 100) && (z < 10) || (z < 0.1)
+        #if include_tau_uv
+        #    density = findleaf(wind.quadtree, [r, 0.]).data[1]
+        #    abs_uv = exp(-z * wind.bh.R_g * SIGMA_T * density)
+        #else
+        #    abs_uv = 1.0
+        #end
+        #return [0.0, force_radiation(r, wind.config["radiation"]["constant_frad_height"], fm, wind, include_tau_uv = false)[2] * abs_uv]
+        println("FS r : $r, z: $z")
+        flush(stdout)
+        @time int_values = integrate_fromstreamline(r, z, wind, include_tau_uv = include_tau_uv)
+        println(int_values)
+    else
+        println("N r : $r, z: $z")
+        flush(stdout)
+        @time int_values = integrate(r, z, wind, include_tau_uv=include_tau_uv)
+        println(int_values)
     end
-    int_values = integrate(r, z, wind, include_tau_uv=include_tau_uv)
     if wind.config["wind"]["nofm"]
         fm = 0.
     end

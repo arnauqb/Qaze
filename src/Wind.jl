@@ -39,6 +39,8 @@ function start_iteration!(it_num, until_line, wind::WindStruct)
             break
         end
         if it_num > 1
+            println("erasing line...")
+            flush(stdout)
             erase_line_from_tree!(i, wind)
         end
         line = start_line!(i, r_0, wind)
@@ -47,12 +49,12 @@ function start_iteration!(it_num, until_line, wind::WindStruct)
 end
 
 function start_lines!(wind::WindStruct, until_line = nothing)
-    wind.radiation.include_tauuv = false
+    wind.radiation.include_tauuv = false 
     for it_num in 1:wind.config["wind"]["iterations"]
         @printf("Iteration %02d of %02d\n", it_num, wind.config["wind"]["iterations"])
         flush(stdout)
         if it_num > 1
-            update_mdot_grid!(wind)
+            #update_mdot_grid!(wind)
             wind.radiation.include_tauuv = true
             wind.config["radiation"]["tau_uv_include_fm"] && (wind.radiation.include_fm_tauuv = true)
         end
