@@ -23,7 +23,7 @@ function initialize_line!(line_id, r_0, z_0, v_0, n_0, v_th, wind::WindStruct)
     l = v_phi_0 * r_0 # initial angular momentum
     lw0 = wind.lines_widths[line_id]
     linewidth_normalized = lw0 / r_0
-    #fill_and_refine!([r_0, z_0], [r_0, z_0], linewidth_normalized, n_0, 0., line_id, wind) # fill first point
+    fill_and_refine!([r_0, z_0], [r_0, z_0+1e-6], linewidth_normalized, n_0, 0., line_id, wind) # fill first point
     a_r_0, a_z_0, fm, xi, dv_dr, tau_x = compute_initial_acceleration(r_0, z_0, v_0, n_0, v_th, l, wind)
     u0 = [r_0, z_0, 0., v_0]
     du0 = [0., v_0, a_r_0, a_z_0]
@@ -111,8 +111,8 @@ function residual!(resid, du, u, line, t)
     a_T = sqrt(v_r_dot^2 + v_z_dot^2)
     dv_dr = a_T / v_T
     n = compute_density(r, z, v_T, line)
-    println("taux")
-    @time tau_x = compute_tau_x(r, z, line.wind)
+    #println("taux")
+    tau_x = compute_tau_x(r, z, line.wind)
     xi = ionization_parameter(r, z, n, tau_x, line.wind)
     tau_eff = compute_tau_eff(n, dv_dr, line.v_th)
     fm = force_multiplier(tau_eff, xi)
@@ -198,9 +198,9 @@ function save(u, t, integrator)
     linewidth_normalized = integrator.p.line_width / integrator.p.r_0 
     currentpoint = [r, z]
     previouspoint = [r_0, z_0]
-    println("filling ")
-    @time fill_and_refine!(previouspoint, currentpoint, linewidth_normalized, n, fm, integrator.p.line_id, integrator.p.wind)
-    println("------------------")
+    #println("filling ")
+    fill_and_refine!(previouspoint, currentpoint, linewidth_normalized, n, fm, integrator.p.line_id, integrator.p.wind)
+    #println("------------------")
     integrator.p.u_hist = [integrator.p.u_hist ; transpose(u)]
     push!(integrator.p.fm_hist, fm)
     push!(integrator.p.n_hist, n)

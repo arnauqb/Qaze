@@ -31,7 +31,8 @@ a = 0
 boost by the force multiplier."
 function compute_tauuv_leaf(point, intersection, leaf)
     deltad = distance2d(point, intersection) #* wind.bh.R_g
-    density = leaf.data[1]
+    cellheight = cell_width(leaf)
+    density = leaf.data[3] / cellheight
     tauuv = density * deltad #* SIGMA_T 
     return tauuv
 end

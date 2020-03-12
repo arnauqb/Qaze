@@ -101,7 +101,8 @@ and X-Ray optical depth
 function compute_taux_leaf(point, intersection, taux0, leaf, wind::WindStruct)
     deltad = distance2d(point, intersection) * wind.bh.R_g # cell size
     d = distance2d([0.,wind.z_0], intersection) * wind.bh.R_g # distance from the center
-    density = leaf.data[1]
+    cellheight = cell_width(leaf)
+    density = leaf.data[3] / cellheight
     xi0 = wind.radiation.xray_luminosity / (density * d^2)
     #xi = xi0
     #for i = 1:2 
@@ -144,9 +145,9 @@ function compute_tau_x(r, z, wind::WindStruct)
         intersection = compute_cell_intersection(currentpoint, currentleaf, point1, point2)
         #push!(coords_list, intersection)
         taux += compute_taux_leaf(currentpoint, intersection, taux, currentleaf, wind)
-        if taux > 40
-            return 40.0
-        end
+        #if taux > 40
+        #    return 40.0
+        #end
         currentpoint = intersection
         currentleaf = findleaf(wind.quadtree, currentpoint)
     end
@@ -239,15 +240,15 @@ function force_radiation(r, z, fm, wind::WindStruct ; include_tau_uv = false)
         #    abs_uv = 1.0
         #end
         #return [0.0, force_radiation(r, wind.config["radiation"]["constant_frad_height"], fm, wind, include_tau_uv = false)[2] * abs_uv]
-        println("FS r : $r, z: $z")
-        flush(stdout)
-        @time int_values = integrate_fromstreamline(r, z, wind, include_tau_uv = include_tau_uv)
-        println(int_values)
+        #println("FS r : $r, z: $z")
+        #flush(stdout)
+        int_values = integrate_fromstreamline(r, z, wind, include_tau_uv = include_tau_uv)
+        #println(int_values)
     else
-        println("N r : $r, z: $z")
-        flush(stdout)
-        @time int_values = integrate(r, z, wind, include_tau_uv=include_tau_uv)
-        println(int_values)
+        #println("N r : $r, z: $z")
+        #flush(stdout)
+        int_values = integrate(r, z, wind, include_tau_uv=include_tau_uv)
+        #println(int_values)
     end
     if wind.config["wind"]["nofm"]
         fm = 0.

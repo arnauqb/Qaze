@@ -4,3 +4,6 @@ Manifest.toml
 *.gif
 *.svg
 profiling.jl
+*.h5
+*.jld
+*.mem
