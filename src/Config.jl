@@ -1,6 +1,7 @@
 export initialize
 using PyCall
 using RegionTrees
+using Interpolations
 
 
 "Initialize wind model from config file in TOML format"
@@ -81,7 +82,9 @@ function initialize_radiation(config::Dict, bh::BlackHoleStruct, sed::PyObject)
     bol_lumin = bh.mdot * edd_lumin
     xray_lumin = f_x * bol_lumin
     force_constant = 3 / (8 * pi * bh.eta)
-    rad = RadiationStruct(bol_lumin, edd_lumin, f_uv, f_x, xray_lumin, force_constant, false, false)
+    fm_k_interpolator = extrapolate(interpolate((K_INTERP_XI_VALUES,), K_INTERP_K_VALUES, Gridded(Linear())), Flat())
+    fm_eta_interpolator = extrapolate(interpolate((ETAMAX_INTERP_XI_VALUES,), ETAMAX_INTERP_ETAMAX_VALUES, Gridded(Linear())), Flat())
+    rad = RadiationStruct(bol_lumin, edd_lumin, f_uv, f_x, xray_lumin, force_constant, fm_eta_interpolator, fm_k_interpolator, false, false)
     return rad
 end
 

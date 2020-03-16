@@ -1,5 +1,6 @@
 using PyCall
 using RegionTrees: AbstractRefinery, Cell
+using Interpolations
 export GridsStruct, BlackHoleStruct, RadiationStruct, StreamlineStruct, WindStruct, GridRefinery
 
 struct GridsStruct
@@ -33,6 +34,8 @@ mutable struct RadiationStruct
     f_x::Float64
     xray_luminosity::Float64
     force_constant::Float64
+    eta_interpolator::Interpolations.Extrapolation
+    k_interpolator::Interpolations.Extrapolation
     include_tauuv::Bool
     include_fm_tauuv::Bool
 end

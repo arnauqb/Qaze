@@ -1,5 +1,4 @@
 export tau_uv_disk_blob,
-       tau_uv_disk_blob_fromstreamline,
        integrate_kernel, integrate_notau_kernel, integrate,
        integrate_fromstreamline_kernel, integrate_fromstreamline,
        integrate_gauss_kernel_r,
@@ -33,30 +32,30 @@ function compute_tauuv_leaf(point, intersection, leaf)
     deltad = distance2d(point, intersection) #* wind.bh.R_g
     cellheight = cell_width(leaf)
     density = leaf.data[3] / cellheight
+    #println(leaf.data[3]/leaf.data[2])
     tauuv = density * deltad #* SIGMA_T 
     return tauuv
 end
 
 function compute_delta2(r_d, phi_d, r, z)
     delta = r^2 + z^2 + r_d^2 - 2. * r * r_d * cos(phi_d)
-    return delta
+    return max(delta, 0.) # sometimes it overflows...
 end
 
 """
 Compute the UV optical depth from a disc patch located at (r_d, phi_d),
 until a gas element at (r,z). 
 """
-function tau_uv_disk_blob(r_d, phi_d, r, z, delta, quadtree, rgsigma)
+function tau_uv_disk_blob(r_d, r, z, quadtree, maxtau)
     r_d > r ? backwards = true : backwards = false
     point1 = [r_d, 0.0]
     point1leaf = findleaf(quadtree, point1)
     point2 = [r,z]
     point2leaf = findleaf(quadtree, point2)
-    maxtau = 14 / rgsigma
     if point1leaf == point2leaf
         tauuv = compute_tauuv_leaf(point1, point2, point1leaf)
-        tauuv = tauuv / sqrt((r-r_d)^2 + z^2) * delta
-        return tauuv * rgsigma
+        #tauuv = tauuv / sqrt((r-r_d)^2 + z^2) * delta * rgsigma
+        return tauuv
     end
     intersection = compute_cell_intersection(point1, point1leaf, point1, point2)
     tauuv = compute_tauuv_leaf(point1, intersection, point1leaf)
@@ -66,22 +65,21 @@ function tau_uv_disk_blob(r_d, phi_d, r, z, delta, quadtree, rgsigma)
     while currentleaf != point2leaf
         intersection = compute_cell_intersection(currentpoint, currentleaf, point1, point2)
         tauuv += compute_tauuv_leaf(currentpoint, intersection, currentleaf)
-        if tauuv > maxtau
-            return 14.0
-        end
+        tauuv >= maxtau && return tauuv
         currentpoint = intersection
         backwards && (currentpoint[1] -= 1e-8)
         currentleaf = findleaf(quadtree, currentpoint)
     end
     tauuv += compute_tauuv_leaf(currentpoint, point2, currentleaf)
-    tauuv = tauuv / sqrt((r-r_d)^2 + z^2) * delta * rgsigma
+    #tauuv = tauuv / sqrt((r-r_d)^2 + z^2) * delta * rgsigma
     return tauuv
 end
 
-function integrate_kernel(v, r_d, phi_d, r, z, wind, rgsigma)
+function integrate_kernel(v, r_d, phi_d, r, z, wind, rgsigma, maxtau)
     r_d_arg = get_index(wind.grids.disk_range, r_d)
     delta2 = compute_delta2(r_d, phi_d, r, z)
-    tau_uv = tau_uv_disk_blob(r_d, phi_d, r, z, sqrt(delta2), wind.quadtree, rgsigma)
+    tau_uv = tau_uv_disk_blob(r_d, r, z, wind.quadtree, maxtau) * rgsigma
+    tau_uv = tau_uv / sqrt((r-r_d)^2 + z^2) * sqrt(delta2)
     nt = nt_rel_factors(r_d, wind.bh.spin, wind.bh.isco)
     phi_part =  exp(-tau_uv) / delta2^2
     f_uv = wind.grids.uv_fractions[r_d_arg]
@@ -109,13 +107,14 @@ function integrate(r, z, wind::WindStruct; include_tau_uv=true, maxevals = 3000)
     rgsigma = wind.bh.R_g * SIGMA_T
     xmin = (wind.config["disk"]["inner_radius"], 0.)
     xmax = (wind.config["disk"]["outer_radius"], pi)
+    maxtau = 20 / rgsigma
     if include_tau_uv
         (val, err) = hcubature(2, 
-                (x,v) ->integrate_kernel(v, x[1], x[2], r, z, wind, rgsigma),
+                (x,v) ->integrate_kernel(v, x[1], x[2], r, z, wind, rgsigma, maxtau),
                 xmin,
                 xmax,
                 reltol = wind.config["radiation"]["integral_rtol"],
-                abstol=1e-15,
+                abstol=0.0,
                 maxevals=maxevals
                 )
     else
@@ -124,7 +123,7 @@ function integrate(r, z, wind::WindStruct; include_tau_uv=true, maxevals = 3000)
                 xmin,
                 xmax,
                 reltol = wind.config["radiation"]["integral_rtol"],
-                abstol=1e-15,
+                abstol=0.0,
                 maxevals=maxevals
                 )
     end
@@ -171,7 +170,7 @@ function integrate_parallel(r, z, wind::WindStruct; include_tau_uv=true, maxeval
                 xmin,
                 xmax,
                 reltol = wind.config["radiation"]["integral_rtol"],
-                abstol=1e-15,
+                abstol=0,
                 maxevals=maxevals
                 )
     else
@@ -180,7 +179,7 @@ function integrate_parallel(r, z, wind::WindStruct; include_tau_uv=true, maxeval
                 xmin,
                 xmax,
                 reltol = wind.config["radiation"]["integral_rtol"],
-                abstol=1e-15,
+                abstol=0,
                 maxevals=maxevals
                 )
     end
@@ -191,37 +190,6 @@ end
 #### experimental ######
 
 
-function tau_uv_disk_blob_fromstreamline(p, psi, r, r_d, z, delta, quadtree, rgsigma)
-    r_d > r ? backwards=true : backwards=false
-    point1 = [r_d, 0]
-    point1leaf = findleaf(quadtree, point1)
-    point2 = [r,z]
-    point2leaf = findleaf(quadtree, point2)
-    maxtau = 14.0# * rgsigma
-    if point1leaf == point2leaf
-        tauuv = compute_tauuv_leaf(point1, point2, point1leaf)
-        tauuv = tauuv / sqrt((r-r_d)^2 + z^2) * delta
-        return tauuv * rgsigma
-    end
-    intersection = compute_cell_intersection(point1, point1leaf, point1, point2)
-    tauuv = compute_tauuv_leaf(point1, intersection, point1leaf)
-    currentpoint = intersection
-    backwards && (currentpoint[1] -= 1e-8)
-    currentleaf = findleaf(quadtree, currentpoint)
-    while currentleaf != point2leaf
-        intersection = compute_cell_intersection(currentpoint, currentleaf, point1, point2)
-        tauuv += compute_tauuv_leaf(currentpoint, intersection, currentleaf)
-        if tauuv * rgsigma > maxtau
-            return 14.0
-        end
-        currentpoint = intersection
-        backwards && (currentpoint[1] -= 1e-8)
-        currentleaf = findleaf(quadtree, currentpoint)
-    end
-    tauuv += compute_tauuv_leaf(currentpoint, point2, currentleaf)
-    tauuv = tauuv / sqrt((r-r_d)^2 + z^2) * delta * rgsigma 
-    return tauuv
-end
 
 function integrate_fromstreamline_notau_kernel(v, p, psi, r, z, wind, r_max)
     cosψ = cos(psi)
@@ -229,6 +197,7 @@ function integrate_fromstreamline_notau_kernel(v, p, psi, r, z, wind, r_max)
     if r_d <= 6.
         v[1] = 0.
         v[2] = 0.
+        return nothing
     end
     r_d_arg = get_index(wind.grids.disk_range, r_d)
     f_uv = wind.grids.uv_fractions[r_d_arg]
@@ -239,42 +208,47 @@ function integrate_fromstreamline_notau_kernel(v, p, psi, r, z, wind, r_max)
     v[2] = common_part
 end
 
-function integrate_fromstreamline_kernel(v, p, psi, r, z, wind, r_max, rgsigma)
+function integrate_fromstreamline_kernel(v, p, psi, r, z, wind, r_max, rgsigma, maxtau)
     cosψ = cos(psi)
     r_d = sqrt(r^2 + p^2 - 2 * p * r * cosψ)
     if r_d <= 6.
         v[1] = 0.
         v[2] = 0.
+        return nothing
     end
     r_d_arg = get_index(wind.grids.disk_range, r_d)
     f_uv = wind.grids.uv_fractions[r_d_arg]
     mdot = wind.grids.mdot[r_d_arg]
     nt = nt_rel_factors(r_d, wind.bh.spin, wind.bh.isco)
-    delta = sqrt(p^2 + z^2)
-    tauuv = tau_uv_disk_blob_fromstreamline(p, psi, r, r_d, z, delta, wind.quadtree, rgsigma)
-    common_part = nt * mdot * f_uv * p / delta^4 / r_d^3 * exp(-tauuv)
+    delta2 = p^2 + z^2
+    tauuv = tau_uv_disk_blob(r_d, r, z, wind.quadtree, maxtau)  * rgsigma
+    tauuv = tauuv / sqrt((r-r_d)^2 + z^2) * sqrt(delta2)
+    common_part = nt * mdot * f_uv * p / delta2^2 / r_d^3 * exp(-tauuv)
     v[1] = common_part * p * cosψ
     v[2] = common_part
 end
 
 function integrate_fromstreamline(r, z, wind::WindStruct; include_tau_uv=true, maxevals=3000)
     rgsigma = wind.bh.R_g * SIGMA_T
+    maxtau = 20 /rgsigma
     r_max = wind.config["disk"]["outer_radius"]
     xmin = (0., 0.)
+    #xmax = (r+r_max, pi)
+    xmax = (100, pi)
     #xmax = (r + r_max, pi)
-    if r < 100
-        xmax = (r + r_max, pi)
-    else
-        xmax = (100, pi)
-    end
+    #if r < 200
+    #    xmax = (r + r_max, pi)
+    #else
+    #    xmax = (200, pi)
+    #end
 
     if include_tau_uv
         (val, err) = hcubature(2, 
-            (x,v) ->integrate_fromstreamline_kernel(v, x[1], x[2], r, z, wind, r_max, rgsigma),
+            (x,v) ->integrate_fromstreamline_kernel(v, x[1], x[2], r, z, wind, r_max, rgsigma, maxtau),
             xmin,
             xmax,
             reltol = wind.config["radiation"]["integral_rtol"],
-            abstol=1e-10,
+            abstol=0.0,
             maxevals=maxevals,
         )
     else
@@ -283,7 +257,7 @@ function integrate_fromstreamline(r, z, wind::WindStruct; include_tau_uv=true, m
             xmin,
             xmax,
             reltol = wind.config["radiation"]["integral_rtol"],
-            abstol=1e-10,
+            abstol=0.0,
             maxevals=maxevals,
         )
     end
@@ -465,34 +439,34 @@ function integrate_for(x_r, x_phi, w_r, w_phi, precomputes, r, z, wind)
 end
 
 
-function tau_uv_disk_blob(r_d, r, z, (quadtree, maxtau))
-    r_d > r ? backwards = true : backwards = false
-    point1 = [r_d, 0.0]
-    point1leaf = findleaf(quadtree, point1)
-    point2 = [r,z]
-    point2leaf = findleaf(quadtree, point2)
-    if point1leaf == point2leaf
-        tauuv = compute_tauuv_leaf(point1, point2, point1leaf)
-        return tauuv 
-    end
-    intersection = compute_cell_intersection(point1, point1leaf, point1, point2)
-    tauuv = compute_tauuv_leaf(point1, intersection, point1leaf)
-    currentpoint = intersection
-    backwards && (currentpoint[1] -= 1e-8)
-    currentleaf = findleaf(quadtree, currentpoint)
-    while currentleaf != point2leaf
-        intersection = compute_cell_intersection(currentpoint, currentleaf, point1, point2)
-        tauuv += compute_tauuv_leaf(currentpoint, intersection, currentleaf)
-        if tauuv > maxtau
-            return 14.0
-        end
-        currentpoint = intersection
-        backwards && (currentpoint[1] -= 1e-8)
-        currentleaf = findleaf(quadtree, currentpoint)
-    end
-    tauuv += compute_tauuv_leaf(currentpoint, point2, currentleaf)
-    return tauuv
-end
+#function tau_uv_disk_blob(r_d, r, z, (quadtree, maxtau))
+#    r_d > r ? backwards = true : backwards = false
+#    point1 = [r_d, 0.0]
+#    point1leaf = findleaf(quadtree, point1)
+#    point2 = [r,z]
+#    point2leaf = findleaf(quadtree, point2)
+#    if point1leaf == point2leaf
+#        tauuv = compute_tauuv_leaf(point1, point2, point1leaf)
+#        return tauuv 
+#    end
+#    intersection = compute_cell_intersection(point1, point1leaf, point1, point2)
+#    tauuv = compute_tauuv_leaf(point1, intersection, point1leaf)
+#    currentpoint = intersection
+#    backwards && (currentpoint[1] -= 1e-8)
+#    currentleaf = findleaf(quadtree, currentpoint)
+#    while currentleaf != point2leaf
+#        intersection = compute_cell_intersection(currentpoint, currentleaf, point1, point2)
+#        tauuv += compute_tauuv_leaf(currentpoint, intersection, currentleaf)
+#        if tauuv > maxtau
+#            return 14.0
+#        end
+#        currentpoint = intersection
+#        backwards && (currentpoint[1] -= 1e-8)
+#        currentleaf = findleaf(quadtree, currentpoint)
+#    end
+#    tauuv += compute_tauuv_leaf(currentpoint, point2, currentleaf)
+#    return tauuv
+#end
 
 #function precomputable(r_d, phi_d, wind)
 #    r_d = r_d * (1600 - 6)/2 + (1600 + 6)/2

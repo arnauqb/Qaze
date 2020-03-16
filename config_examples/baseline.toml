@@ -1,7 +1,7 @@
 title = "Qwind config file"
 
 [general]
-save_path = "tests.json"
+save_path = "tests2.json"
 verbosity = 0
 
 [bh]
@@ -37,12 +37,12 @@ no_tau_uv = false
 no_tau_uv_z = false 
 tau_uv_include_fm = false
 constant_frad_height = 0.1
-cak_K = 0.3
+cak_K = 0.03
 
 [wind]
-initial_radius = "warm_radius"
-final_radius = 1200.0
-number_streamlines = 60
+initial_radius = 7#"warm_radius"
+final_radius = 1000.0
+number_streamlines = 40
 iterations = 4
 log_spaced = true 
 wind_temperature = 2.5e4 
@@ -50,7 +50,7 @@ initial_conditions = "manual"
 n_0 = "cak"
 v_0 = "thermal"
 z_0 = 0.0
-solver_rtol = 1e-2
+solver_rtol = 1e-4
 gravity_only = false 
 nofm = false
 consistent_mdot = false

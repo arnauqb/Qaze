@@ -104,7 +104,8 @@ function write_line(json_file, line::StreamlineStruct, it_num)
         "v_T" => sqrt.(line.u_hist[:,3].^2 + line.u_hist[:,4].^2),
         "n" => line.n_hist,
         "fm" => line.fm_hist,
-        "xi" => line.xi_hist
+        "xi" => line.xi_hist,
+        "taux" => line.tau_x_hist
     )
     data = open(json_file, "r") do f
         data = JSON.parse(f)
@@ -119,6 +120,7 @@ function write_line(json_file, line::StreamlineStruct, it_num)
     end
     open(json_file, "w") do f
         push!(data[@sprintf("it_%02d", it_num)]["lines"], line_data)
+        push!(data[@sprintf("it_%02d", it_num)]["lines_escaped"], line.escaped)
         JSON.print(f, data)
     end
 end

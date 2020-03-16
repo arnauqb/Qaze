@@ -59,7 +59,7 @@ function initialize_line!(line_id, r_0, z_0, v_0, n_0, v_th, wind::WindStruct)
     cb = CallbackSet(termination_cb, saving_cb)
     problem = DAEProblem(residual!, du0, u0, tspan, p=line, differential_vars=[true, true, true, true])
     integrator = init(problem, IDA(), callback=cb)#, dtmax=5e-2 * wind.bh.R_g / C)
-    integrator.opts.abstol = 0 # [1e-5, 1e-5, 1e-8, 1e-8]
+    integrator.opts.abstol = 1e-7#[1e-5, 1e-6, 1e-7, 1e-7]  #0 # [1e-5, 1e-5, 1e-8, 1e-8]
     integrator.opts.reltol = wind.config["wind"]["solver_rtol"]
     return integrator
 end
@@ -73,7 +73,7 @@ function compute_initial_acceleration(r_0, z_0, v_0, n_0, v_th, l, wind::WindStr
     fg = gravity(r_0, z_0, wind.bh)
     tau_x = compute_tau_x(r_0, z_0, wind)
     xi = ionization_parameter(r_0, z_0, n_0, tau_x, wind)
-    fm = force_multiplier(1, xi)
+    fm = force_multiplier(1, xi, wind)
     fr = force_radiation(r_0, z_0, fm, wind, include_tau_uv=wind.radiation.include_tauuv)
     centrifugal_term = l^2 / r_0^3
     a_r = fg[1] + fr[1] + centrifugal_term
@@ -82,7 +82,7 @@ function compute_initial_acceleration(r_0, z_0, v_0, n_0, v_th, l, wind::WindStr
     a_T = sqrt(a_r^2 + a_z^2)
     dv_dr = a_T / v_0
     tau_eff = compute_tau_eff(n_0, dv_dr, v_th)
-    fm = force_multiplier(tau_eff, xi)
+    fm = force_multiplier(tau_eff, xi, wind)
     fr = force_radiation(r_0, z_0, fm, wind, include_tau_uv=wind.radiation.include_tauuv)
     a_r = fg[1] + fr[1] + centrifugal_term
     a_z = fg[2] + fr[2] 
@@ -94,6 +94,8 @@ function residual!(resid, du, u, line, t)
     #println("residual")
     #flush(stdout)
     r, z, v_r, v_z = u
+    println("residual")
+    println("u : $u")
     r_dot, z_dot, v_r_dot, v_z_dot = du
     if z < 0 || r < 0 # if integrator tries outside domain, switch off radiation
         fg = gravity(r, z, line.wind.bh)
@@ -115,7 +117,7 @@ function residual!(resid, du, u, line, t)
     tau_x = compute_tau_x(r, z, line.wind)
     xi = ionization_parameter(r, z, n, tau_x, line.wind)
     tau_eff = compute_tau_eff(n, dv_dr, line.v_th)
-    fm = force_multiplier(tau_eff, xi)
+    fm = force_multiplier(tau_eff, xi, line.wind)
     fr = force_radiation(r, z, fm, line.wind, include_tau_uv=line.wind.radiation.include_tauuv)
     centrifugal_term = line.l^2 / r^3
     a_r = fg[1] + fr[1] + centrifugal_term
@@ -135,9 +137,9 @@ function condition(u, t, integrator)
     v_esc = sqrt(2. / d)
     v_T > v_esc && (integrator.p.escaped=true)
     crossing_condition = false
-    if (r < integrator.p.r_0) && (z < 0.2 * maximum(integrator.p.u_hist[:,2]))
-        crossing_condition = true
-    end
+    #if (r < integrator.p.r_0) && (z < 0.2 * maximum(integrator.p.u_hist[:,2]))
+    #    crossing_condition = true
+    #end
     #if r < integrator.p.r_0# - 1
     #    integrator.p.crossing_counter += 1
     #    if integrator.p.crossing_counter >= 10
@@ -145,15 +147,7 @@ function condition(u, t, integrator)
     #    end
     #end
 
-    #stalling_condition = false
-    #z_hist = integrator.p.u_hist[:,2]
-    #if length(z_hist) > 200
-    #    if std(z_hist[end-10:end]) < 0.02
-    #        println("stalled")
-    #        stalling_condition = true
-    #    end
-    #end
-    stalling_condition = false
+    stalling_condition = false # compute_stalling_condition(integrator, 200)
     if (z < 0.2 * maximum(integrator.p.u_hist[:,2])) && (length(integrator.p.u_hist) > 500) || (length(integrator.p.u_hist) > 5000 )
         stalling_condition = true
     end
@@ -193,14 +187,20 @@ function save(u, t, integrator)
     tau_x = compute_tau_x(r, z, integrator.p.wind)
     xi = ionization_parameter(r, z, n, tau_x, integrator.p.wind)
     tau_eff = compute_tau_eff(n, dv_dr, integrator.p.v_th)
-    fm = force_multiplier(tau_eff, xi)
+    fm = force_multiplier(tau_eff, xi, integrator.p.wind)
     r_0, z_0, v_r_0, v_z_0 = integrator.p.u_hist[end, :]
+    n_previous = integrator.p.n_hist[end]
     linewidth_normalized = integrator.p.line_width / integrator.p.r_0 
     currentpoint = [r, z]
     previouspoint = [r_0, z_0]
     #println("filling ")
-    fill_and_refine!(previouspoint, currentpoint, linewidth_normalized, n, fm, integrator.p.line_id, integrator.p.wind)
-    #println("------------------")
+    fill_and_refine!(previouspoint, currentpoint, linewidth_normalized, n_previous, fm, integrator.p.line_id, integrator.p.wind)
+    if length(integrator.p.n_hist) > 1
+        previouspreviouspoint =  integrator.p.u_hist[end-1, 1:2]
+        n_previousprevious = integrator.p.n_hist[end-1]
+        fill_and_refine!(previouspreviouspoint, previouspoint, linewidth_normalized, n_previousprevious, fm, integrator.p.line_id, integrator.p.wind)
+    end
+    println("------------------")
     integrator.p.u_hist = [integrator.p.u_hist ; transpose(u)]
     push!(integrator.p.fm_hist, fm)
     push!(integrator.p.n_hist, n)
@@ -212,3 +212,21 @@ function save(u, t, integrator)
     return u
 end
 #end
+
+function compute_stalling_condition(line, threshold = 50)
+    len = length(line.p.u_hist[:,1])
+    if len <= threshold
+        return false
+    end
+    stdm = 0
+    for i in 1:4
+        values = line.p.u_hist[len-threshold:len, i]
+        stdm += std(values) / mean(values)
+    end
+    if (stdm/4 < 0.1)
+        println("Stalled")
+        return true
+    else
+        return false
+    end
+end

@@ -3,6 +3,11 @@ using Printf
 export initialize_line!, start_lines!, compute_line_mdot, compute_wind_mdot,
        compute_kinetic_luminosity, compute_maximum_velocity, start_iteration!, start_line!
 
+function intialize_line!(i::Int, wind::WindStruct)
+    r = wind.lines_range[i]
+    return initialize_line!(i , r, wind)
+end
+
 function initialize_line!(i, r, wind::WindStruct)
     T = wind.sed.disk_nt_temperature4(r)^(0.25)
     v_th = thermal_velocity(T)
@@ -43,18 +48,23 @@ function start_iteration!(it_num, until_line, wind::WindStruct)
             flush(stdout)
             erase_line_from_tree!(i, wind)
         end
+        # check if there is mass to launch the line
+        r0_idx = get_index(wind.grids.disk_range, r_0)
+        if wind.grids.mdot[r0_idx] <= 0
+            continue
+        end
         line = start_line!(i, r_0, wind)
         write_line(wind.config["general"]["save_path"], line.p, it_num)
     end
 end
 
 function start_lines!(wind::WindStruct, until_line = nothing)
-    wind.radiation.include_tauuv = false 
+    wind.radiation.include_tauuv = true#false 
     for it_num in 1:wind.config["wind"]["iterations"]
         @printf("Iteration %02d of %02d\n", it_num, wind.config["wind"]["iterations"])
         flush(stdout)
         if it_num > 1
-            #update_mdot_grid!(wind)
+            update_mdot_grid!(wind)
             wind.radiation.include_tauuv = true
             wind.config["radiation"]["tau_uv_include_fm"] && (wind.radiation.include_fm_tauuv = true)
         end
@@ -77,7 +87,9 @@ end
 
 function compute_wind_mdot(wind::WindStruct)
     mdot_wind = 0.
-    for line in wind.lines
+    for i in 1:length(wind.lines)
+        isassigned(wind.lines, i) || continue
+        line = wind.lines[i]
         mdot_wind += compute_line_mdot(line, wind)
     end
     return mdot_wind

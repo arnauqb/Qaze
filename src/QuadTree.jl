@@ -26,9 +26,10 @@ end
 
 "Fills a cell with given density and force multiplier information."
 function fill_cell!(density, fm, line_id, height, cell::Cell, wind::WindStruct)
+    n_fill = max(density, cell.data[1])
     deltad = cell_size(cell)
-    n_eff = density * height
-    cell.data = [density, height, density * height]
+    n_eff = n_fill * height
+    cell.data = [n_fill, height, density * height]
     #if line_id in cell.data[4]
     #    cell.data = [n_fill, fm_fill, deltatau, cell.data[4]]
     #else
@@ -102,14 +103,32 @@ function fill_and_refine_linewidth!(point, height, linewidth, density, fm, line_
     point1leaf = copy(currentleaf)
     point2leaf = findleaf(wind.quadtree, point2)
     height_to_fill = height
+    firstpointwidth = min(vertices(currentleaf)[1][1] + currentleaf.boundary.widths[1] - point1[1], 0.1)
+    try
+        @assert firstpointwidth > 0
+    catch
+        println(firstpointwidth)
+        println("vertices")
+        println(vertices(currentleaf))
+        println("width")
+        println(vertices(currentleaf)[3][2])
+        println("point")
+        println(point)
+        @assert firstpointwidth > 0
+    end
+
     #deltad = 0.1 / (wind.bh.R_g * SIGMA_T * density) 
-    height = max(height, 0.01)
+    height = min(max(height, 0.1), 10)
     if point[1] < 50.
         height = min(height, linewidth / 2.)
     end
-    N = floor(log2(cell_width(currentleaf) / height))
+    height_first_point = max(height, firstpointwidth)
+    N = floor(log2(cell_width(currentleaf) / height_first_point))
+    #N = floor(log2(cell_width(currentleaf) / height))
+    #println("height first point : $height_first_point")
+    #println("height : $height")
     while N > 0
-        split!(currentleaf, (x,y)->split_cell_initialization(x,y,height_to_fill))
+        split!(currentleaf, (x,y)->split_cell_initialization(x, y, height_to_fill))
         currentleaf = findleaf(currentleaf, currentpoint)
         N -= 1
     end

@@ -10,6 +10,7 @@ export thermal_velocity,
        ionization_parameter,
        compute_tau_eff,
        force_multiplier,
+       force_multiplier_analytical,
        force_multiplier_k,
        force_multiplier_eta,
        force_radiation
@@ -45,7 +46,10 @@ self consistently. Initially it's initialized at a constant value of Mdot.
 """
 function update_mdot_grid!(wind::WindStruct)
     accumulated_wind = 0.
-    for line in reverse(wind.lines)
+    for i in 1:length(wind.lines)
+        j = length(wind.lines) - i
+        isassigned(wind.lines, j) || continue
+        line = wind.lines[j]
         r_0 = line.p.r_0
         width = line.p.line_width
         rmin_arg = get_index(wind.grids.disk_range, r_0 - width/2.)
@@ -111,7 +115,7 @@ function compute_taux_leaf(point, intersection, taux0, leaf, wind::WindStruct)
     #end
     #taux = density * opacity_x(xi) * deltad * SIGMA_T
     f(t) = t - log(xi0) - taux0 - deltad * density * opacity_x(exp(t)) * SIGMA_T
-    xi = exp(find_zero(f, -5, atol=1))
+    xi = exp(find_zero(f, -5, atol=0.01, maxevals=10))
     taux = density * opacity_x(xi) * deltad * SIGMA_T
     return taux
 end
@@ -201,13 +205,31 @@ Computes the analytical approximation for the force multiplier,
 from Stevens and Kallman 1990. Note that we modify it slightly to avoid
 numerical overflow.
 """
-function force_multiplier(t, xi)
+function force_multiplier_analytical(t, xi)
     @assert t>= 0
     @assert xi>= 0
     ALPHA = 0.6
     TAU_MAX_TOL = 1e-3
     k = force_multiplier_k(xi)
     eta = force_multiplier_eta(xi)
+    tau_max = t * eta
+    if tau_max < TAU_MAX_TOL
+        aux = (1 - ALPHA) * (tau_max^ALPHA)
+    else
+        aux = ((1 + tau_max)^(1-ALPHA) - 1) / ((tau_max)^(1-ALPHA))
+    end
+    fm = k * t^(-ALPHA) * aux
+    @assert fm >= 0
+    return fm
+end
+
+function force_multiplier(t, xi, wind)
+    @assert t>= 0
+    @assert xi>= 0
+    ALPHA = 0.6
+    TAU_MAX_TOL = 1e-3
+    k = wind.radiation.k_interpolator(log10(xi))
+    eta = 10^wind.radiation.eta_interpolator(log10(xi)) 
     tau_max = t * eta
     if tau_max < TAU_MAX_TOL
         aux = (1 - ALPHA) * (tau_max^ALPHA)
@@ -232,7 +254,7 @@ function force_radiation(r, z, fm, wind::WindStruct ; include_tau_uv = false)
     end
     #if (z < wind.config["radiation"]["constant_frad_height"])
     #if (z < 1e-3 * r)
-    if (r > 100) && (z < 10) || (z < 0.1)
+    if false#z < 0.01#(r > 100) && (z < 10) || (z < 0.1)
         #if include_tau_uv
         #    density = findleaf(wind.quadtree, [r, 0.]).data[1]
         #    abs_uv = exp(-z * wind.bh.R_g * SIGMA_T * density)
@@ -240,19 +262,28 @@ function force_radiation(r, z, fm, wind::WindStruct ; include_tau_uv = false)
         #    abs_uv = 1.0
         #end
         #return [0.0, force_radiation(r, wind.config["radiation"]["constant_frad_height"], fm, wind, include_tau_uv = false)[2] * abs_uv]
-        #println("FS r : $r, z: $z")
-        #flush(stdout)
-        int_values = integrate_fromstreamline(r, z, wind, include_tau_uv = include_tau_uv)
-        #println(int_values)
+        println("FS r : $r, z: $z")
+        flush(stdout)
+        @time int_values = integrate_fromstreamline(r, z, wind, include_tau_uv = include_tau_uv)
+        println(int_values)
     else
-        #println("N r : $r, z: $z")
-        #flush(stdout)
-        int_values = integrate(r, z, wind, include_tau_uv=include_tau_uv)
-        #println(int_values)
+        println("N r : $r, z: $z")
+        flush(stdout)
+        @time int_values = integrate(r, z, wind, include_tau_uv=include_tau_uv)
+        #int_values = integrate_parallel(r, z, wind, include_tau_uv=include_tau_uv)
+        println(int_values)
+        if !all(isfinite.(int_values))
+            println("NaN! changing coordinates...!!!!")
+            println("FS r : $r, z: $z")
+            flush(stdout)
+            @time int_values = integrate_fromstreamline(r, z, wind, include_tau_uv = include_tau_uv)
+            println(int_values)
+        end
     end
     if wind.config["wind"]["nofm"]
         fm = 0.
     end
+    @assert all(isfinite.(int_values))
     force = wind.radiation.force_constant * (1. + fm) * int_values
     return force
 end
