@@ -2,6 +2,7 @@ title = "Qwind config file"
 
 [general]
 save_path = "model_highres.json"
+save_jld2 = "model_highres.jld2"
 verbosity = 0
 
 [bh]

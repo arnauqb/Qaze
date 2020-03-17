@@ -1,4 +1,5 @@
 using Printf
+using JLD2
 
 export initialize_line!, start_lines!, compute_line_mdot, compute_wind_mdot,
        compute_kinetic_luminosity, compute_maximum_velocity, start_iteration!, start_line!
@@ -35,11 +36,14 @@ function start_line!(line_id, r_0, wind::WindStruct)
     return line
 end
 
-function start_iteration!(it_num, until_line, wind::WindStruct)
+function start_iteration!(it_num, wind::WindStruct, from_line = 1, until_line=nothing)
     if until_line === nothing
         until_line = wind.config["wind"]["number_streamlines"]
     end
     for (i, r_0) in enumerate(wind.lines_range)
+        if i < from_line
+            continue
+        end
         if i > until_line
             break
         end
@@ -55,6 +59,9 @@ function start_iteration!(it_num, until_line, wind::WindStruct)
         end
         line = start_line!(i, r_0, wind)
         write_line(wind.config["general"]["save_path"], line.p, it_num)
+        #if (i+1) % 3 == 0
+        #    @save wind.config["save_jld2"] wind.quadtree wind.grids.mdot
+        #end
     end
 end
 
@@ -68,7 +75,7 @@ function start_lines!(wind::WindStruct, until_line = nothing)
             wind.radiation.include_tauuv = true
             wind.config["radiation"]["tau_uv_include_fm"] && (wind.radiation.include_fm_tauuv = true)
         end
-        start_iteration!(it_num, until_line, wind)
+        start_iteration!(it_num, wind, until_line)
         #refine_all(wind)
         write_properties_and_grids(wind.config["general"]["save_path"], wind, it_num)
     end
