@@ -102,8 +102,8 @@ function fill_and_refine_linewidth!(point, height, linewidth, density, fm, line_
     currentleaf = findleaf(wind.quadtree, point1)
     point1leaf = copy(currentleaf)
     point2leaf = findleaf(wind.quadtree, point2)
-    height_to_fill = height
     firstpointwidth = min(vertices(currentleaf)[1][1] + currentleaf.boundary.widths[1] - point1[1], 0.1)
+    height_to_fill = min(height, linewidth)
     try
         @assert firstpointwidth > 0
     catch
@@ -128,7 +128,7 @@ function fill_and_refine_linewidth!(point, height, linewidth, density, fm, line_
     #println("height first point : $height_first_point")
     #println("height : $height")
     while N > 0
-        split!(currentleaf, (x,y)->split_cell_initialization(x, y, height_to_fill))
+        split!(currentleaf, (x,y) -> split_cell_initialization(x, y, height_to_fill))
         currentleaf = findleaf(currentleaf, currentpoint)
         N -= 1
     end

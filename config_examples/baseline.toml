@@ -1,7 +1,7 @@
 title = "Qwind config file"
 
 [general]
-save_path = "tests2.json"
+save_path = "model_highres.json"
 verbosity = 0
 
 [bh]
@@ -20,7 +20,7 @@ r_min = 0.0
 z_min = 0.0
 r_max = 10000.0
 z_max = 10000.0
-n_r_disk = 1000
+n_r_disk = 3000
 n_vacuum = 1e2
 tree_initial_divisions = 2
 cell_optical_thickness = 0.1
@@ -42,8 +42,8 @@ cak_K = 0.03
 [wind]
 initial_radius = 7#"warm_radius"
 final_radius = 1000.0
-number_streamlines = 40
-iterations = 4
+number_streamlines = 1000
+iterations = 6
 log_spaced = true 
 wind_temperature = 2.5e4 
 initial_conditions = "manual"

@@ -234,7 +234,7 @@ function integrate_fromstreamline(r, z, wind::WindStruct; include_tau_uv=true, m
     r_max = wind.config["disk"]["outer_radius"]
     xmin = (0., 0.)
     #xmax = (r+r_max, pi)
-    xmax = (100, pi)
+    xmax = (1000, pi)
     #xmax = (r + r_max, pi)
     #if r < 200
     #    xmax = (r + r_max, pi)
