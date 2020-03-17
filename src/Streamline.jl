@@ -57,7 +57,7 @@ function initialize_line!(line_id, r_0, z_0, v_0, n_0, v_th, wind::WindStruct)
     #cb = CallbackSet(termination_cb, saving_cb, steadystate_cb)
     #cbtol = AutoAbstol(init_curmax=0.0)
     cb = CallbackSet(termination_cb, saving_cb)
-    problem = DAEProblem(residual!, du0, u0, tspan, p=line, differential_vars=[true, true, true, true])
+    problem = DAEProblem(residual!, du0, u0, tspan, p=line, differential_vars=[true, true, true, true], init_all=true)
     integrator = init(problem, IDA(), callback=cb)#, dtmax=5e-2 * wind.bh.R_g / C)
     integrator.opts.abstol = 1e-7#[1e-5, 1e-6, 1e-7, 1e-7]  #0 # [1e-5, 1e-5, 1e-8, 1e-8]
     integrator.opts.reltol = wind.config["wind"]["solver_rtol"]

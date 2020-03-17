@@ -254,7 +254,7 @@ function force_radiation(r, z, fm, wind::WindStruct ; include_tau_uv = false)
     end
     #if (z < wind.config["radiation"]["constant_frad_height"])
     #if (z < 1e-3 * r)
-    if false#z < 0.01#(r > 100) && (z < 10) || (z < 0.1)
+    if z < 0.1 #z < 0.01#(r > 100) && (z < 10) || (z < 0.1)
         #if include_tau_uv
         #    density = findleaf(wind.quadtree, [r, 0.]).data[1]
         #    abs_uv = exp(-z * wind.bh.R_g * SIGMA_T * density)
