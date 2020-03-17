@@ -118,7 +118,7 @@ function fill_and_refine_linewidth!(point, height, linewidth, density, fm, line_
     end
 
     #deltad = 0.1 / (wind.bh.R_g * SIGMA_T * density) 
-    height = min(max(height, 0.1), 10)
+    height = min(max(height, wind.config["grids"]["minimum_cell_size"]), 10)
     if point[1] < 50.
         height = min(height, linewidth / 2.)
     end

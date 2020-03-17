@@ -288,22 +288,6 @@ end
 
 
 # gauss thinks 
-
-function integrate_kernel(v, r_d, phi_d, r, z, wind, rgsigma, maxtau)
-    r_d_arg = get_index(wind.grids.disk_range, r_d)
-    delta2 = compute_delta2(r_d, phi_d, r, z)
-    tau_uv = tau_uv_disk_blob(r_d, r, z, wind.quadtree, maxtau) * rgsigma
-    tau_uv = tau_uv / sqrt((r-r_d)^2 + z^2) * sqrt(delta2)
-    nt = nt_rel_factors(r_d, wind.bh.spin, wind.bh.isco)
-    phi_part =  exp(-tau_uv) / delta2^2
-    f_uv = wind.grids.uv_fractions[r_d_arg]
-    mdot = wind.grids.mdot[r_d_arg]
-    r_part = nt / r_d^2 * f_uv * mdot 
-    aux = r_part * phi_part
-    v[1] = (r - r_d * cos(phi_d)) * aux
-    v[2] = aux
-end
-
 function integral_gauss_kernel_r_phid(phi_d, r_d, r, z, wind)
     delta2 = compute_delta2(r_d, phi_d, r, z)
     phid_part =  (r - r_d * cos(phi_d)) / delta2^2
