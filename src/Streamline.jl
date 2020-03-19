@@ -195,8 +195,8 @@ function save(u, t, integrator)
     linewidth_normalized = integrator.p.line_width / integrator.p.r_0 
     currentpoint = [r, z]
     previouspoint = [r_0, z_0]
-    println("filling point...")
-    quadtree_fill_timestep(currentpoint, previouspoint, linewidth_normalized, integrator.p.line_id, integrator.p.wind)
+    #println("filling point...")
+    #quadtree_fill_timestep(currentpoint, previouspoint, linewidth_normalized, integrator.p.line_id, integrator.p.wind)
     #println("filling ")
     #fill_and_refine!(previouspoint, currentpoint, linewidth_normalized, n_previous, fm, integrator.p.line_id, integrator.p.wind)
     #if length(integrator.p.n_hist) > 1

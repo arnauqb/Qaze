@@ -66,7 +66,8 @@ function start_iteration!(it_num, wind::WindStruct, from_line = 1, until_line=no
             continue
         end
         line = start_line!(i, r_0, wind)
-        #println("filling and refining line...")
+        println("filling and refining line...")
+        quadtree_fill_line(line, i, wind)
         #fill_and_refine_line!(line, i, wind)
         write_line(wind.config["general"]["save_path"], line.p, it_num)
         #if (i+1) % 3 == 0

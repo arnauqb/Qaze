@@ -117,6 +117,14 @@ function interpolate_density(line, point, wind)
     return n
 end
 
+function interpolate_density(line_id::Int, point, wind)
+    if line_id == 0
+        return wind.config["grids"]["n_vacuum"]
+    else
+        return interpolate_density(wind.lines[line_id], point, wind)
+    end
+end
+
 function test_interp(points, line)
     points = reshape(points, 2, length(points))
     n_interp = interpolate_density.(Ref(line), points)
