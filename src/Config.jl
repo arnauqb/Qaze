@@ -91,9 +91,13 @@ end
 function initialize_quadtree(config::Dict, bh::BlackHoleStruct, grids::GridsStruct)
     quadtree_max_radius = config["grids"]["r_max"]
     quadtree_max_height = config["grids"]["z_max"]
+    #quadtree = Cell(SVector(0., 0.), 
+    #                SVector(2 * quadtree_max_radius, 2* quadtree_max_height),
+    #                [grids.n_vacuum * quadtree_max_height, quadtree_max_height] # density, fm , cell optical thickness, lines that pass through this cell
+    #                )
     quadtree = Cell(SVector(0., 0.), 
                     SVector(2 * quadtree_max_radius, 2* quadtree_max_height),
-                    [grids.n_vacuum * quadtree_max_height, quadtree_max_height] # density, fm , cell optical thickness, lines that pass through this cell
+                    [0] # density, fm , cell optical thickness, lines that pass through this cell
                     )
     return quadtree
 end
@@ -118,6 +122,7 @@ function initialize_wind(config::Dict, bh::BlackHoleStruct, sed::PyObject, grids
         lines_widths = diff([lines_range ; lines_range[end]])
     end
     lines = Array{Any,1}(undef, config["wind"]["number_streamlines"])
+    interpolators = Array{Any,1}(undef, config["wind"]["number_streamlines"])
     z_0 = config["wind"]["z_0"]
     wind = WindStruct(config,
                       bh,
@@ -126,6 +131,7 @@ function initialize_wind(config::Dict, bh::BlackHoleStruct, sed::PyObject, grids
                       quadtree,
                       radiation,
                       lines,
+                      interpolators,
                       lines_initial_radius,
                       lines_range,
                       lines_widths,

@@ -48,6 +48,7 @@ mutable struct WindStruct
     quadtree::Cell
     radiation::RadiationStruct
     lines::Array{Any,1}
+    interpolators::Array{Any, 1}
     lines_initial_radius::Float64
     lines_range::Array{Float64,1}
     lines_widths::Array{Float64,1}

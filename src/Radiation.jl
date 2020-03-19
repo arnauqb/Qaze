@@ -145,6 +145,7 @@ following the lightray direction (0,0) -> (r,z). At each cell,
 we consistently compute tau_x and the ionization parameter.
 """
 function compute_tau_x(r, z, wind::WindStruct)
+    return 40
     z = max(z, wind.z_0)
     @assert z >= 0
     point1 = [0.0, wind.z_0]
