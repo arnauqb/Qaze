@@ -40,6 +40,14 @@ function start_iteration!(it_num, wind::WindStruct, from_line = 1, until_line=no
     if until_line === nothing
         until_line = wind.config["wind"]["number_streamlines"]
     end
+    if it_num == 1
+        wind.radiation.include_tauuv = false 
+    elseif it_num == 2
+        wind.radiation.include_tauuv = true
+    else
+        wind.radiation.include_tauuv = true
+        update_mdot_grid!(wind)
+    end
     for (i, r_0) in enumerate(wind.lines_range)
         if i < from_line
             continue
@@ -58,26 +66,28 @@ function start_iteration!(it_num, wind::WindStruct, from_line = 1, until_line=no
             continue
         end
         line = start_line!(i, r_0, wind)
+        println("filling and refining line...")
+        fill_and_refine_line!(line, i, wind)
         write_line(wind.config["general"]["save_path"], line.p, it_num)
         #if (i+1) % 3 == 0
         #    @save wind.config["save_jld2"] wind.quadtree wind.grids.mdot
         #end
     end
+    write_properties_and_grids(wind.config["general"]["save_path"], wind, it_num)
 end
 
 function start_lines!(wind::WindStruct, until_line = nothing)
-    wind.radiation.include_tauuv = true#false 
+    #wind.radiation.include_tauuv = true#false 
     for it_num in 1:wind.config["wind"]["iterations"]
         @printf("Iteration %02d of %02d\n", it_num, wind.config["wind"]["iterations"])
         flush(stdout)
-        if it_num > 1
-            update_mdot_grid!(wind)
-            wind.radiation.include_tauuv = true
-            wind.config["radiation"]["tau_uv_include_fm"] && (wind.radiation.include_fm_tauuv = true)
-        end
-        start_iteration!(it_num, wind, until_line)
+        #if it_num > 1
+        #    update_mdot_grid!(wind)
+        #    wind.radiation.include_tauuv = true
+        #    wind.config["radiation"]["tau_uv_include_fm"] && (wind.radiation.include_fm_tauuv = true)
+        #end
+        start_iteration!(it_num, wind, 1, until_line)
         #refine_all(wind)
-        write_properties_and_grids(wind.config["general"]["save_path"], wind, it_num)
     end
 end
 

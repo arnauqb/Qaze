@@ -31,9 +31,9 @@ minimum_cell_size = 0.01
 f_uv = "auto" 
 f_x = "auto"
 integral_rtol = 1e-3
-analytical_fm = true
+analytical_fm = false 
 tau_uv_geometry = "disk"
-disk_uv_fraction = true 
+disk_uv_fraction = true  
 no_tau_uv = false
 no_tau_uv_z = false 
 tau_uv_include_fm = false
@@ -41,9 +41,9 @@ constant_frad_height = 0.1
 cak_K = 0.03
 
 [wind]
-initial_radius = 7#"warm_radius"
+initial_radius = 6.0 
 final_radius = 1000.0
-number_streamlines = 1000
+number_streamlines = 50
 iterations = 6
 log_spaced = true 
 wind_temperature = 2.5e4 

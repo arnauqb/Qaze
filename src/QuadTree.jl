@@ -1,6 +1,7 @@
 using RegionTrees
 using StaticArrays: SVector
 using RegionTrees
+using Statistics
 import Base: copy, ==
 export copy,
        compute_cell_intersection,
@@ -13,7 +14,8 @@ export copy,
        fill_and_refine_line!,
        fill_and_refine_all_lines!,
        erase_line_from_tree!,
-       reinitialize_tree!
+       reinitialize_tree!,
+       prune_tree
 
 "Computes the diagonal of the cell"
 function cell_size(cell::Cell)
@@ -26,15 +28,13 @@ end
 
 "Fills a cell with given density and force multiplier information."
 function fill_cell!(density, fm, line_id, height, cell::Cell, wind::WindStruct)
-    n_fill = max(density, cell.data[1])
-    deltad = cell_size(cell)
-    n_eff = n_fill * height
-    cell.data = [n_fill, height, density * height]
-    #if line_id in cell.data[4]
-    #    cell.data = [n_fill, fm_fill, deltatau, cell.data[4]]
-    #else
-    #    cell.data = [n_fill, fm_fill, deltatau, push!(cell.data[4], line_id)]
-    #end
+    cellsize = cell_width(cell)
+    if cell.data[1] == 1e2
+        cell.data = [density * height, height]
+    else
+        H = height + cell.data[2]
+        cell.data = [cell.data[1] + density * height, H]
+    end
 end
 
 "Method of the copy function for Cell type"
@@ -54,7 +54,7 @@ function reinitialize_tree!(wind::WindStruct)
     quadtree_max_height = wind.config["grids"]["z_max"]
     n_vacuum = wind.grids.n_vacuum
     delta_tau_0 = n_vacuum * sqrt(quadtree_max_height^2 + quadtree_max_radius^2) * wind.bh.R_g * SIGMA_T
-    wind.quadtree = Cell(SVector(0., 0.), SVector(2 * quadtree_max_radius, 2* quadtree_max_height), [n_vacuum, quadtree_max_height, quadtree_max_height * n_vacuum])
+    wind.quadtree = Cell(SVector(0., 0.), SVector(2 * quadtree_max_radius, 2* quadtree_max_height), [n_vacuum * quadtree_max_height, quadtree_max_height ])
 end
 
 "Following the line initialpoint -> finalpoint, computes the intersection after the current point
@@ -86,7 +86,7 @@ end
 
 "Initializes cell data after split"
 function split_cell_initialization(cell, child_indices, height)
-    newdata = [1e2, height, 1e2 * height]
+    newdata = [1e2 * height, height]
     return newdata
 end
 
@@ -123,7 +123,7 @@ function fill_and_refine_linewidth!(point, height, linewidth, density, fm, line_
         height = min(height, linewidth / 2.)
     end
     height_first_point = max(height, firstpointwidth)
-    N = floor(log2(cell_width(currentleaf) / height_first_point))
+    N = ceil(log2(cell_width(currentleaf) / height_first_point))
     #N = floor(log2(cell_width(currentleaf) / height))
     #println("height first point : $height_first_point")
     #println("height : $height")
@@ -241,4 +241,24 @@ function erase_line_from_tree!(line_id, wind::WindStruct)
     #    fill_and_refine_line!(line, i, wind)
     #end
     #fill_and_refine_all_lines!(wind)
+end
+
+function prune_tree(quadtree)
+    for leaf in allleaves(quadtree)
+        pnt = parent(leaf)
+        data = leaf.data
+        different = 0
+        leaff = leaf
+        for leaf2 in allleaves(pnt)
+            if data == leaf.data 
+                different = 1
+                leaff = leaf2
+                break
+            end
+        end
+        if different == 0
+            pnt.children = nothing
+            pnt.data = [leaff.data[1], 2 * leaff.data[2], 2 * leaff.data[3]]
+        end
+    end
 end

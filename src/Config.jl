@@ -93,7 +93,7 @@ function initialize_quadtree(config::Dict, bh::BlackHoleStruct, grids::GridsStru
     quadtree_max_height = config["grids"]["z_max"]
     quadtree = Cell(SVector(0., 0.), 
                     SVector(2 * quadtree_max_radius, 2* quadtree_max_height),
-                    [grids.n_vacuum, quadtree_max_height, quadtree_max_height * grids.n_vacuum] # density, fm , cell optical thickness, lines that pass through this cell
+                    [grids.n_vacuum * quadtree_max_height, quadtree_max_height] # density, fm , cell optical thickness, lines that pass through this cell
                     )
     return quadtree
 end

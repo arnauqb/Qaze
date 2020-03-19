@@ -23,7 +23,7 @@ function initialize_line!(line_id, r_0, z_0, v_0, n_0, v_th, wind::WindStruct)
     l = v_phi_0 * r_0 # initial angular momentum
     lw0 = wind.lines_widths[line_id]
     linewidth_normalized = lw0 / r_0
-    fill_and_refine!([r_0, z_0], [r_0, z_0+1e-6], linewidth_normalized, n_0, 0., line_id, wind) # fill first point
+    #fill_and_refine!([r_0, z_0], [r_0, z_0+1e-6], linewidth_normalized, n_0, 0., line_id, wind) # fill first point
     a_r_0, a_z_0, fm, xi, dv_dr, tau_x = compute_initial_acceleration(r_0, z_0, v_0, n_0, v_th, l, wind)
     u0 = [r_0, z_0, 0., v_0]
     du0 = [0., v_0, a_r_0, a_z_0]
@@ -94,8 +94,8 @@ function residual!(resid, du, u, line, t)
     #println("residual")
     #flush(stdout)
     r, z, v_r, v_z = u
-    println("residual")
-    println("u : $u")
+    #println("residual")
+    #println("u : $u")
     r_dot, z_dot, v_r_dot, v_z_dot = du
     if z < 0 || r < 0 # if integrator tries outside domain, switch off radiation
         fg = gravity(r, z, line.wind.bh)
@@ -194,13 +194,13 @@ function save(u, t, integrator)
     currentpoint = [r, z]
     previouspoint = [r_0, z_0]
     #println("filling ")
-    fill_and_refine!(previouspoint, currentpoint, linewidth_normalized, n_previous, fm, integrator.p.line_id, integrator.p.wind)
-    if length(integrator.p.n_hist) > 1
-        previouspreviouspoint =  integrator.p.u_hist[end-1, 1:2]
-        n_previousprevious = integrator.p.n_hist[end-1]
-        fill_and_refine!(previouspreviouspoint, previouspoint, linewidth_normalized, n_previousprevious, fm, integrator.p.line_id, integrator.p.wind)
-    end
-    println("------------------")
+    #fill_and_refine!(previouspoint, currentpoint, linewidth_normalized, n_previous, fm, integrator.p.line_id, integrator.p.wind)
+    #if length(integrator.p.n_hist) > 1
+    #    previouspreviouspoint =  integrator.p.u_hist[end-1, 1:2]
+    #    n_previousprevious = integrator.p.n_hist[end-1]
+    #    fill_and_refine!(previouspreviouspoint, previouspoint, linewidth_normalized, n_previousprevious, fm, integrator.p.line_id, integrator.p.wind)
+    #end
+    println("-----------------------------")
     integrator.p.u_hist = [integrator.p.u_hist ; transpose(u)]
     push!(integrator.p.fm_hist, fm)
     push!(integrator.p.n_hist, n)

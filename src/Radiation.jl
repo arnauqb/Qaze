@@ -13,9 +13,10 @@ export thermal_velocity,
        force_multiplier_analytical,
        force_multiplier_k,
        force_multiplier_eta,
-       force_radiation
+       force_radiation,
+       force_xray
 
-function thermal_velocity(T, mu = 1.)
+function thermal_velocity(T, mu = 0.6)
     v = sqrt(K_B * T / (mu * M_P)) / C
     return v
 end
@@ -35,8 +36,8 @@ function initialize_uv_fraction!(wind::WindStruct)
             log_spaced=true
         )
     else
-        wind.grids.disk_r_range = 10 .^(range(log10(wind.bh.disk_r_min), stop = log10(wind.bh.disk_r_max), length=wind.grids.n_disk))
-        wind.grids.uv_fractions = wind.radiation.f_uv .* ones(Float64, wind.grids.n_disk)
+        wind.grids.disk_range .= 10 .^(range(log10(wind.bh.disk_r_min), stop = log10(wind.bh.disk_r_max), length=wind.grids.n_disk))
+        wind.grids.uv_fractions .= wind.radiation.f_uv .* ones(Float64, wind.grids.n_disk)
     end
 end
 
@@ -97,6 +98,15 @@ function opacity_x(xi)
     end
 end
 
+function force_xray(r, z, wind)
+    d = sqrt(r^2 + z^2)
+    Fx = wind.radiation.xray_luminosity / (4 * pi * d^2 * wind.bh.R_g^2)
+    taux = compute_tau_x(r, z, wind)
+    force = SIGMA_E / C * Fx * exp(-taux)
+    force = force / C^2 * wind.bh.R_g
+    return force .* [r/d, z/d]
+end
+
 """
 Computes the variation of optical depth inside a tree leaf.
 We iterate multiple times to compute a consistent ionization parameter
@@ -106,7 +116,8 @@ function compute_taux_leaf(point, intersection, taux0, leaf, wind::WindStruct)
     deltad = distance2d(point, intersection) * wind.bh.R_g # cell size
     d = distance2d([0.,wind.z_0], intersection) * wind.bh.R_g # distance from the center
     cellheight = cell_width(leaf)
-    density = leaf.data[3] / cellheight
+    density = leaf.data[1] / leaf.data[2] 
+    #println("n_mean: $(leaf.data[1])")
     xi0 = wind.radiation.xray_luminosity / (density * d^2)
     #xi = xi0
     #for i = 1:2 
@@ -114,8 +125,15 @@ function compute_taux_leaf(point, intersection, taux0, leaf, wind::WindStruct)
     #    xi = xi0 * exp(-taux)
     #end
     #taux = density * opacity_x(xi) * deltad * SIGMA_T
-    f(t) = t - log(xi0) - taux0 - deltad * density * opacity_x(exp(t)) * SIGMA_T
-    xi = exp(find_zero(f, -5, atol=0.01, maxevals=10))
+    f(t) = t - log(xi0) - taux0 + min(40, deltad * density * opacity_x(exp(t)) * SIGMA_T)
+    if f(20) < 0
+        xi = xi0 
+    elseif f(-20) > 0
+        xi = 1e-20
+    else
+        t = find_zero(f, (-20, 20), Bisection(), atol=0, rtol=0.1)
+        xi = exp(t)
+    end
     taux = density * opacity_x(xi) * deltad * SIGMA_T
     return taux
 end
@@ -254,7 +272,7 @@ function force_radiation(r, z, fm, wind::WindStruct ; include_tau_uv = false)
     end
     #if (z < wind.config["radiation"]["constant_frad_height"])
     #if (z < 1e-3 * r)
-    if z < 0.1 #z < 0.01#(r > 100) && (z < 10) || (z < 0.1)
+    if z <= 200 #z < 0.01#(r > 100) && (z < 10) || (z < 0.1)
         #if include_tau_uv
         #    density = findleaf(wind.quadtree, [r, 0.]).data[1]
         #    abs_uv = exp(-z * wind.bh.R_g * SIGMA_T * density)
@@ -264,12 +282,24 @@ function force_radiation(r, z, fm, wind::WindStruct ; include_tau_uv = false)
         #return [0.0, force_radiation(r, wind.config["radiation"]["constant_frad_height"], fm, wind, include_tau_uv = false)[2] * abs_uv]
         println("FS r : $r, z: $z")
         flush(stdout)
-        @time int_values = integrate_fromstreamline(r, z, wind, include_tau_uv = include_tau_uv)
+        if z <= 1
+            @time int_values = integrate_fromstreamline(r, z, wind, include_tau_uv = include_tau_uv, maxevals=600)
+            #int_values = integrate_fromstreamline(r, z, wind, include_tau_uv = include_tau_uv, maxevals=600)
+        else
+            @time int_values = integrate_fromstreamline(r, z, wind, include_tau_uv = include_tau_uv, maxevals=300)
+            #int_values = integrate_fromstreamline(r, z, wind, include_tau_uv = include_tau_uv, maxevals=300)
+        end
         println(int_values)
     else
         println("N r : $r, z: $z")
         flush(stdout)
-        @time int_values = integrate(r, z, wind, include_tau_uv=include_tau_uv)
+        if z > 100.
+            @time int_values = integrate(r, z, wind, include_tau_uv=include_tau_uv, maxevals=600)
+            #int_values = integrate(r, z, wind, include_tau_uv=include_tau_uv, maxevals=600)
+        else
+            @time int_values = integrate(r, z, wind, include_tau_uv=include_tau_uv, maxevals=1000)
+            #int_values = integrate(r, z, wind, include_tau_uv=include_tau_uv, maxevals=1000)
+        end
         #int_values = integrate_parallel(r, z, wind, include_tau_uv=include_tau_uv)
         println(int_values)
         if !all(isfinite.(int_values))
@@ -284,6 +314,8 @@ function force_radiation(r, z, fm, wind::WindStruct ; include_tau_uv = false)
         fm = 0.
     end
     @assert all(isfinite.(int_values))
-    force = wind.radiation.force_constant * (1. + fm) * int_values
+    force_xr = force_xray(r, z, wind)
+    println("FX: $force_xr")
+    force = wind.radiation.force_constant * (1. + fm) * int_values + force_xr
     return force
 end

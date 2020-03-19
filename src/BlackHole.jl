@@ -1,4 +1,4 @@
-export gravity, SS_temperature, gravity_cgs, eddington_luminosity, bolometric_luminosity, mass_accretion_rate
+export gravity, SS_temperature, NT_temperature, gravity_cgs, eddington_luminosity, bolometric_luminosity, mass_accretion_rate
 
 "Gravitational force in units of c^2/R_g"
 function gravity(r, z, bh::BlackHoleStruct)
@@ -14,6 +14,12 @@ function SS_temperature(r, bh::BlackHoleStruct)
     b = 8 * pi * (r * bh.R_g)^3 * SIGMA_SB
     T = (a/b)^(0.25)
     return T
+end
+
+function NT_temperature(r, bh::BlackHoleStruct)
+    T_SS = SS_temperature(r, bh)
+    T_NT = T_SS * nt_rel_factors(r, bh.spin, bh.isco)
+    return T_NT
 end
 
 "Gravitational force in cgs units."
