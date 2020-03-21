@@ -85,7 +85,10 @@ function start_iteration!(it_num, wind::WindStruct, from_line = 1, until_line=no
         #    @save wind.config["save_jld2"] wind.quadtree wind.grids.mdot
         #end
     end
+    mdotcopy = copy(wind.grids.mdot)
+    update_mdot_grid!(wind)
     write_properties_and_grids(wind.config["general"]["save_path"], wind, it_num)
+    wind.grids.mdot .= mdotcopy
     qt = wind.quadtree
     @save wind.config["general"]["save_jld2"] qt
 end

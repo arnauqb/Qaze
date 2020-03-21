@@ -132,16 +132,21 @@ function write_properties_and_grids(json_file, wind::WindStruct, it_num)
     properties = Dict(
         "mdot_w_gs" => mdot_wind,
         "mdot_w_msunyr" => mdot_wind / M_SUN * YEAR_TO_SEC,
+        "mdot_w_normalized" => mdot_wind / mass_accretion_rate(wind.bh),
         "terminal_velocity" => compute_maximum_velocity(wind),
         "kin_lumin" => kin_lumin,
         "kin_lumin_norm" => kin_lumin / eddington_luminosity(wind.bh),
+    )
+    grids = Dict(
+        "disk_range" => wind.grids.disk_range,
+        "mdot" => wind.grids.mdot
     )
     data = open(json_file, "r") do f
         data = JSON.parse(f)
     end
     open(json_file, "w") do f
         data[@sprintf("it_%02d", it_num)]["properties"] = properties
-        #data[@sprintf("it_%02d", it_num)]["grids"] = grids 
+        data[@sprintf("it_%02d", it_num)]["grids"] = grids 
         JSON.print(f,data)
     end
     print("done \n")

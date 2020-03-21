@@ -38,7 +38,7 @@ no_tau_uv = false
 no_tau_uv_z = false 
 tau_uv_include_fm = false
 constant_frad_height = 1
-cak_K = 0.3
+cak_K = 0.03
 
 [wind]
 initial_radius = 6.0 
