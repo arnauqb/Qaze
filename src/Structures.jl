@@ -1,7 +1,7 @@
 using PyCall
 using RegionTrees: AbstractRefinery, Cell
 using Interpolations
-export GridsStruct, BlackHoleStruct, RadiationStruct, StreamlineStruct, WindStruct, GridRefinery
+export GridsStruct, BlackHoleStruct, RadiationStruct, StreamlineStruct, WindStruct, CellData
 
 struct GridsStruct
     n_disk::Int64
@@ -48,6 +48,7 @@ mutable struct WindStruct
     quadtree::Cell
     radiation::RadiationStruct
     lines::Array{Any,1}
+    interpolators::Array{Any, 1}
     lines_initial_radius::Float64
     lines_range::Array{Float64,1}
     lines_widths::Array{Float64,1}
@@ -76,4 +77,12 @@ mutable struct StreamlineStruct
     dv_dr_hist::Array{Float64,1}
     a_r_hist::Array{Float64,1}
     a_z_hist::Array{Float64,1}
+end
+
+mutable struct CellData
+    line_id::Int
+    z_positions::Array{Float64, 1}
+    densities::Array{Float64, 1}
+    z_max::Float64
+    direction::Int # 1 up, -1 down, 0 undecided
 end

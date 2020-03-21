@@ -54,8 +54,10 @@ function cak_surface_mloss(r_0, wind::WindStruct, K=0.03)
     return Sigma
 end
 
-function cak_density(r_0, wind::WindStruct)
-    K = wind.config["radiation"]["cak_K"]
+function cak_density(r_0, wind::WindStruct, K=nothing)
+    if K === nothing
+        K = wind.config["radiation"]["cak_K"]
+    end
     Sigma = cak_surface_mloss(r_0, wind, K)
     T = compute_temperature(r_0, wind) 
     b = thermal_velocity(T) * C

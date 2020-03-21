@@ -16,11 +16,16 @@ export tau_uv_disk_blob,
        findcommonparent,
        integral_gauss_kernel_r_phid,
        integral_gauss_kernel_r_rd,
+       integrate_kernel_normalized,
+       integrate_cuba,
+       tau_uv_integrand,
+       tau_uv_integral,
        a
        
        #X_phi, W_phi, X_r, W_r
 using Cubature
 using QuadGK
+using Cuba
 #x, w = gauss(10, 0, pi)
 #const X_phi = x
 #const W_phi = w
@@ -31,12 +36,9 @@ a=0
 
 "Computes the UV optical depth inside a leaf, taking into account the opacity
 boost by the force multiplier."
-function compute_tauuv_leaf(point, intersection, leaf)
+function compute_tauuv_leaf(point, intersection, leaf, wind)
     deltad = distance2d(point, intersection) #* wind.bh.R_g
-    cellheight = cell_width(leaf)
-    density = leaf.data[3] / cellheight
-    #println(leaf.data[3]/leaf.data[2])
-    tauuv = density * deltad #* SIGMA_T 
+    tauuv = deltad * interpolate_density(leaf.data.line_id, point, leaf, wind)
     return tauuv
 end
 
@@ -45,65 +47,41 @@ function compute_delta2(r_d, phi_d, r, z)
     return max(delta, 0.) # sometimes it overflows...
 end
 
-function allparents(cell::Cell)
-    Channel() do c
-        queue = [cell]
-        while !isempty(queue)
-            current = pop!(queue)
-            p = parent(current)
-            if ! (p === nothing)
-                put!(c, p)
-                push!(queue, p)
-            end
-        end
-    end
-end
-
-function findcommonparent(leaf1, leaf2)
-    for parent1 in allparents(leaf1)
-        for parent2 in allparents(leaf2)
-            if parent1 == parent2
-                return parent1
-            end
-        end
-    end
-end
-
 """
 Compute the UV optical depth from a disc patch located at (r_d, phi_d),
 until a gas element at (r,z). 
 """
-function tau_uv_disk_blob(r_d, r, z, quadtree, maxtau)
+function tau_uv_disk_blob(r_d, r, z, wind, maxtau)
     r_d > r ? backwards = true : backwards = false
     point1 = [r_d, 0.0]
-    point1leaf = findleaf(quadtree, point1)
+    point1leaf = findleaf(wind.quadtree, point1)
     point2 = [r,z]
-    point2leaf = findleaf(quadtree, point2)
+    point2leaf = findleaf(wind.quadtree, point2)
     if point1leaf == point2leaf
-        tauuv = compute_tauuv_leaf(point1, point2, point1leaf)
+        tauuv = compute_tauuv_leaf(point1, point2, point1leaf, wind)
         return tauuv
     end
     intersection = compute_cell_intersection(point1, point1leaf, point1, point2)
-    tauuv = compute_tauuv_leaf(point1, intersection, point1leaf)
+    tauuv = compute_tauuv_leaf(point1, intersection, point1leaf, wind)
     currentpoint = intersection
     backwards && (currentpoint[1] -= 1e-8)
-    currentleaf = findleaf(quadtree, currentpoint)
+    currentleaf = findleaf(wind.quadtree, currentpoint)
     while currentleaf != point2leaf
         intersection = compute_cell_intersection(currentpoint, currentleaf, point1, point2)
-        tauuv += compute_tauuv_leaf(currentpoint, intersection, currentleaf)
+        tauuv += compute_tauuv_leaf(currentpoint, intersection, currentleaf, wind)
         tauuv >= maxtau && return tauuv
         currentpoint = intersection
         backwards && (currentpoint[1] -= 1e-8)
-        currentleaf = findleaf(quadtree, currentpoint)
+        currentleaf = findleaf(wind.quadtree, currentpoint)
     end
-    tauuv += compute_tauuv_leaf(currentpoint, point2, currentleaf)
+    tauuv += compute_tauuv_leaf(currentpoint, point2, currentleaf, wind)
     return tauuv
 end
 
 function integrate_kernel(v, r_d, phi_d, r, z, wind, rgsigma, maxtau)
     r_d_arg = get_index(wind.grids.disk_range, r_d)
     delta2 = compute_delta2(r_d, phi_d, r, z)
-    tau_uv = tau_uv_disk_blob(r_d, r, z, wind.quadtree, maxtau) * rgsigma
+    tau_uv = tau_uv_disk_blob(r_d, r, z, wind, maxtau) * rgsigma
     tau_uv = tau_uv / sqrt((r-r_d)^2 + z^2) * sqrt(delta2)
     nt = nt_rel_factors(r_d, wind.bh.spin, wind.bh.isco)
     phi_part =  exp(-tau_uv) / delta2^2
@@ -131,9 +109,9 @@ end
 function integrate(r, z, wind::WindStruct; include_tau_uv=true, maxevals = 500)
     global a = 0
     rgsigma = wind.bh.R_g * SIGMA_T
+    maxtau = 20 / rgsigma
     xmin = (wind.config["disk"]["inner_radius"], 0.)
     xmax = (wind.config["disk"]["outer_radius"], pi)
-    maxtau = 20 / rgsigma
     if include_tau_uv
         (val, err) = hcubature(2, 
                 (x,v) ->integrate_kernel(v, x[1], x[2], r, z, wind, rgsigma, maxtau),
@@ -161,7 +139,7 @@ function integrate_parallel_kernel(v, r_d, phi_d, args)
     r, z, wind, rgsigma, maxtau = args
     r_d_arg = get_index.(Ref(wind.grids.disk_range), r_d)
     delta2 = compute_delta2.(r_d, phi_d, r, z)
-    tau_uv = tau_uv_disk_blob.(r_d, r, z, Ref(wind.quadtree), maxtau) * rgsigma
+    tau_uv = tau_uv_disk_blob.(r_d, r, z, Ref(wind), maxtau) * rgsigma
     tau_uv = @. tau_uv / sqrt((r-r_d)^2 + z^2) * sqrt(delta2)
     nt = nt_rel_factors.(r_d, wind.bh.spin, wind.bh.isco)
     phi_part =  @. exp(-tau_uv) / delta2^2
@@ -249,7 +227,7 @@ function integrate_fromstreamline_kernel(v, p, psi, r, z, wind, r_max, rgsigma, 
     mdot = wind.grids.mdot[r_d_arg]
     nt = nt_rel_factors(r_d, wind.bh.spin, wind.bh.isco)
     delta2 = p^2 + z^2
-    tauuv = tau_uv_disk_blob(r_d, r, z, wind.quadtree, maxtau)  * rgsigma
+    tauuv = tau_uv_disk_blob(r_d, r, z, wind, maxtau)  * rgsigma
     tauuv = tauuv / sqrt((r-r_d)^2 + z^2) * sqrt(delta2)
     common_part = nt * mdot * f_uv * p / delta2^2 / r_d^3 * exp(-tauuv)
     v[1] = common_part * p * cosψ
@@ -262,7 +240,7 @@ function integrate_fromstreamline(r, z, wind::WindStruct; include_tau_uv=true, m
     r_max = wind.config["disk"]["outer_radius"]
     xmin = (0., 0.)
     #xmax = (r+r_max, pi)
-    xmax = (100, pi)
+    xmax = (min(max(10, z * 100), 1000), pi)
     if include_tau_uv
         (val, err) = hcubature(2, 
             (x,v) ->integrate_fromstreamline_kernel(v, x[1], x[2], r, z, wind, r_max, rgsigma, maxtau),
@@ -285,8 +263,6 @@ function integrate_fromstreamline(r, z, wind::WindStruct; include_tau_uv=true, m
     return [2*z, 2*z^2] .* val
 end
 
-
-
 # gauss thinks 
 function integral_gauss_kernel_r_phid(phi_d, r_d, r, z, wind)
     delta2 = compute_delta2(r_d, phi_d, r, z)
@@ -303,4 +279,35 @@ function integral_gauss_kernel_r_rd(r_d, r, z, wind)
     phi_part, _ = quadgk(x -> integral_gauss_kernel_r_phid(x, r_d, r, z, wind), 0, pi, rtol=1e-3, atol=0)
     println(phi_part)
     return r_part * phi_part
+end
+
+function integrate_kernel_normalized(v, r_d, phi_d, r, z, wind, maxtau, rgsigma)
+    r_max = 1000
+    r_min = 6
+    r_d = r_d * (r_max- r_min) + r_min
+    phi_d = pi * phi_d 
+    dr = (r_max - r_min)
+    dphi = pi
+    r_d_arg = get_index(wind.grids.disk_range, r_d)
+    delta2 = compute_delta2(r_d, phi_d, r, z)
+    tau_uv = tau_uv_disk_blob(r_d, r, z, wind.quadtree, maxtau) * rgsigma
+    tau_uv = tau_uv / sqrt((r-r_d)^2 + z^2) * sqrt(delta2)
+    nt = nt_rel_factors(r_d, wind.bh.spin, wind.bh.isco)
+    phi_part =  exp(-tau_uv) / delta2^2
+    f_uv = wind.grids.uv_fractions[r_d_arg]
+    mdot = wind.grids.mdot[r_d_arg]
+    r_part = nt / r_d^2 * f_uv * mdot 
+    aux = r_part * phi_part * dr * dphi
+    v[1] = (r - r_d * cos(phi_d)) * aux
+    v[2] = aux
+end
+
+
+function integrate_cuba(r, z, wind)
+    rgsigma = wind.bh.R_g * SIGMA_T
+    maxtau = 20 / rgsigma
+    result = cuhre((x, f) -> integrate_kernel_normalized(f, x[1], x[2], r, z, wind, maxtau, rgsigma), 2, 2, atol=0, rtol=1e-2, maxevals=1000)
+    println(result)
+    result = result.integral
+    return 2z .* [result[1], z*result[2]]
 end
