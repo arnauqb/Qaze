@@ -75,7 +75,7 @@ function start_lines!(wind::WindStruct, until_line = nothing)
             wind.radiation.include_tauuv = true
             wind.config["radiation"]["tau_uv_include_fm"] && (wind.radiation.include_fm_tauuv = true)
         end
-        start_iteration!(it_num, wind, until_line)
+        start_iteration!(it_num, wind, 1, until_line)
         #refine_all(wind)
         write_properties_and_grids(wind.config["general"]["save_path"], wind, it_num)
     end

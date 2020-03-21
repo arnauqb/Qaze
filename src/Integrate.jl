@@ -128,7 +128,7 @@ function integrate_notau_kernel(v, r_d, phi_d, r, z, wind)
     v[2] = aux
 end
 
-function integrate(r, z, wind::WindStruct; include_tau_uv=true, maxevals = 3000)
+function integrate(r, z, wind::WindStruct; include_tau_uv=true, maxevals = 500)
     global a = 0
     rgsigma = wind.bh.R_g * SIGMA_T
     xmin = (wind.config["disk"]["inner_radius"], 0.)
