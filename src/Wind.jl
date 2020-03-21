@@ -98,11 +98,6 @@ function start_lines!(wind::WindStruct, until_line = nothing)
     for it_num in 1:wind.config["wind"]["iterations"]
         @printf("Iteration %02d of %02d\n", it_num, wind.config["wind"]["iterations"])
         flush(stdout)
-        #if it_num > 1
-        #    update_mdot_grid!(wind)
-        #    wind.radiation.include_tauuv = true
-        #    wind.config["radiation"]["tau_uv_include_fm"] && (wind.radiation.include_fm_tauuv = true)
-        #end
         start_iteration!(it_num, wind, 1, until_line)
         #refine_all(wind)
     end

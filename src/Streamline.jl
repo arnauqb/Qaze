@@ -149,7 +149,7 @@ function condition(u, t, integrator)
     #    end
     #end
 
-    stalling_condition = false # compute_stalling_condition(integrator, 200)
+    stalling_condition = compute_stalling_condition(integrator, 200)
     if (z < 0.2 * maximum(integrator.p.u_hist[:,2])) && (length(integrator.p.u_hist) > 500) || (length(integrator.p.u_hist) > 5000 )
         stalling_condition = true
     end
