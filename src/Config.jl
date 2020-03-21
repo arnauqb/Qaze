@@ -97,7 +97,8 @@ function initialize_quadtree(config::Dict, bh::BlackHoleStruct, grids::GridsStru
     #                )
     quadtree = Cell(SVector(0., 0.), 
                     SVector(2 * quadtree_max_radius, 2* quadtree_max_height),
-                    [0] # density, fm , cell optical thickness, lines that pass through this cell
+                    CellData(0, Float64[], Float64[], 0, 0)
+                    #[0, Array{Float64}(undef, 2, 0), Float64[]] # line_id position density 
                     )
     return quadtree
 end
@@ -111,11 +112,18 @@ function initialize_wind(config::Dict, bh::BlackHoleStruct, sed::PyObject, grids
     end
     lines_final_radius = config["wind"]["final_radius"]
     if config["wind"]["log_spaced"]
-        dlogr = (log10(lines_final_radius) - log10(lines_initial_radius)) / n_lines
-        log_r_range = [log10(lines_initial_radius) + (i+0.5) * dlogr for i in 0:n_lines-1]
-        lines_range = 10 .^ log_r_range
-        border_value = 10^(log10(lines_range[end]) + dlogr)
-        lines_widths = diff([lines_range ; border_value])
+        line_delimiters = 10 .^ range(log10(lines_initial_radius), log10(lines_final_radius), length=n_lines+1)
+        lines_range = []
+        for i in 1:n_lines
+            r0 = line_delimiters[i] + (line_delimiters[i+1] - line_delimiters[i]) / 2.
+            push!(lines_range, r0)
+        end
+        lines_widths = diff(line_delimiters)
+        #dlogr = (log10(lines_final_radius) - log10(lines_initial_radius)) / n_lines
+        #log_r_range = [log10(lines_initial_radius) + (i+0.5) * dlogr for i in 0:n_lines-1]
+        #lines_range = 10 .^ log_r_range
+        #border_value = 10^(log10(lines_range[end]) + dlogr)
+        #lines_widths = diff([lines_range ; border_value])
     else
         dr = (lines_final_radius - lines_initial_radius) / n_lines 
         lines_range = [lines_initial_radius + (i+0.5) * dr for i in 0:n_lines-1]

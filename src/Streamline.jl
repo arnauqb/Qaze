@@ -196,7 +196,7 @@ function save(u, t, integrator)
     currentpoint = [r, z]
     previouspoint = [r_0, z_0]
     #println("filling point...")
-    #quadtree_fill_timestep(currentpoint, previouspoint, linewidth_normalized, integrator.p.line_id, integrator.p.wind)
+    #quadtree_fill_timestep(currentpoint, previouspoint, n, linewidth_normalized, integrator.p.line_id, integrator.p.wind)
     #println("filling ")
     #fill_and_refine!(previouspoint, currentpoint, linewidth_normalized, n_previous, fm, integrator.p.line_id, integrator.p.wind)
     #if length(integrator.p.n_hist) > 1
@@ -204,6 +204,7 @@ function save(u, t, integrator)
     #    n_previousprevious = integrator.p.n_hist[end-1]
     #    fill_and_refine!(previouspreviouspoint, previouspoint, linewidth_normalized, n_previousprevious, fm, integrator.p.line_id, integrator.p.wind)
     #end
+    println("r: $r z :$z")
     println("-----------------------------")
     integrator.p.u_hist = [integrator.p.u_hist ; transpose(u)]
     push!(integrator.p.fm_hist, fm)

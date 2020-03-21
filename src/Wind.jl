@@ -58,11 +58,22 @@ function start_iteration!(it_num, wind::WindStruct, from_line = 1, until_line=no
         if it_num > 1
             println("erasing line...")
             flush(stdout)
-            erase_line_from_tree!(i, wind)
+            quadtree_initialize(wind)
+            for (j, line) in enumerate(wind.lines)
+                if j == i
+                    continue
+                end
+                println("filling line $j of $(length(wind.lines))")
+                quadtree_fill_line(line, j, wind)
+            end
+
+            #erase_line_from_tree!(i, wind)
+            #quadtree_erase_line(i, wind)
         end
         # check if there is mass to launch the line
         r0_idx = get_index(wind.grids.disk_range, r_0)
         if wind.grids.mdot[r0_idx] <= 0
+            wind.lines[i] = nothing
             continue
         end
         line = start_line!(i, r_0, wind)
@@ -75,6 +86,8 @@ function start_iteration!(it_num, wind::WindStruct, from_line = 1, until_line=no
         #end
     end
     write_properties_and_grids(wind.config["general"]["save_path"], wind, it_num)
+    qt = wind.quadtree
+    @save wind.config["general"]["save_jld2"] qt
 end
 
 function start_lines!(wind::WindStruct, until_line = nothing)
@@ -115,7 +128,9 @@ end
 
 function compute_kinetic_luminosity(wind::WindStruct)
     kin_lumin = 0.
-    for line in wind.lines
+    for i in 1:length(wind.lines)
+        isassigned(wind.lines, i) || continue
+        line = wind.lines[i]
         v_r_f = line.p.u_hist[end,3]
         v_z_f = line.p.u_hist[end,4]
         v_f = sqrt(v_r_f^2 + v_z_f^2) * C
@@ -126,7 +141,9 @@ end
 
 function compute_maximum_velocity(wind::WindStruct)
     maxv = 0.
-    for line in wind.lines
+    for i in 1:length(wind.lines)
+        isassigned(wind.lines, i) || continue
+        line = wind.lines[i]
         if !line.p.escaped
             continue
         end

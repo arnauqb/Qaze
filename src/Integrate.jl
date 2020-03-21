@@ -18,6 +18,8 @@ export tau_uv_disk_blob,
        integral_gauss_kernel_r_rd,
        integrate_kernel_normalized,
        integrate_cuba,
+       tau_uv_integrand,
+       tau_uv_integral,
        a
        
        #X_phi, W_phi, X_r, W_r
@@ -36,10 +38,7 @@ a=0
 boost by the force multiplier."
 function compute_tauuv_leaf(point, intersection, leaf, wind)
     deltad = distance2d(point, intersection) #* wind.bh.R_g
-    tauuv = deltad * interpolate_density(leaf.data[1], point, wind)
-    #cellheight = cell_width(leaf)
-    #density = leaf.data[1] / leaf.data[2]
-    #tauuv = density * deltad
+    tauuv = deltad * interpolate_density(leaf.data.line_id, point, leaf, wind)
     return tauuv
 end
 
@@ -82,7 +81,7 @@ end
 function integrate_kernel(v, r_d, phi_d, r, z, wind, rgsigma, maxtau)
     r_d_arg = get_index(wind.grids.disk_range, r_d)
     delta2 = compute_delta2(r_d, phi_d, r, z)
-    tau_uv = tau_uv_disk_blob(r_d, r, z, wind.quadtree, maxtau) * rgsigma
+    tau_uv = tau_uv_disk_blob(r_d, r, z, wind, maxtau) * rgsigma
     tau_uv = tau_uv / sqrt((r-r_d)^2 + z^2) * sqrt(delta2)
     nt = nt_rel_factors(r_d, wind.bh.spin, wind.bh.isco)
     phi_part =  exp(-tau_uv) / delta2^2
@@ -140,7 +139,7 @@ function integrate_parallel_kernel(v, r_d, phi_d, args)
     r, z, wind, rgsigma, maxtau = args
     r_d_arg = get_index.(Ref(wind.grids.disk_range), r_d)
     delta2 = compute_delta2.(r_d, phi_d, r, z)
-    tau_uv = tau_uv_disk_blob.(r_d, r, z, Ref(wind.quadtree), maxtau) * rgsigma
+    tau_uv = tau_uv_disk_blob.(r_d, r, z, Ref(wind), maxtau) * rgsigma
     tau_uv = @. tau_uv / sqrt((r-r_d)^2 + z^2) * sqrt(delta2)
     nt = nt_rel_factors.(r_d, wind.bh.spin, wind.bh.isco)
     phi_part =  @. exp(-tau_uv) / delta2^2
@@ -228,7 +227,7 @@ function integrate_fromstreamline_kernel(v, p, psi, r, z, wind, r_max, rgsigma, 
     mdot = wind.grids.mdot[r_d_arg]
     nt = nt_rel_factors(r_d, wind.bh.spin, wind.bh.isco)
     delta2 = p^2 + z^2
-    tauuv = tau_uv_disk_blob(r_d, r, z, wind.quadtree, maxtau)  * rgsigma
+    tauuv = tau_uv_disk_blob(r_d, r, z, wind, maxtau)  * rgsigma
     tauuv = tauuv / sqrt((r-r_d)^2 + z^2) * sqrt(delta2)
     common_part = nt * mdot * f_uv * p / delta2^2 / r_d^3 * exp(-tauuv)
     v[1] = common_part * p * cosψ

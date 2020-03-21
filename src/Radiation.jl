@@ -116,7 +116,7 @@ function compute_taux_leaf(point, intersection, taux0, leaf, wind::WindStruct)
     deltad = distance2d(point, intersection) * wind.bh.R_g # cell size
     d = distance2d([0.,wind.z_0], intersection) * wind.bh.R_g # distance from the center
     cellheight = cell_width(leaf)
-    density = interpolate_density(leaf.data[1], point, wind) #leaf.data[1] / leaf.data[2] 
+    density = interpolate_density(leaf.data.line_id, point, leaf, wind) #leaf.data[1] / leaf.data[2] 
     xi0 = wind.radiation.xray_luminosity / (density * d^2)
     f(t) = t - log(xi0) - taux0 + min(40, deltad * density * opacity_x(exp(t)) * SIGMA_T)
     if f(20) < 0
@@ -273,28 +273,28 @@ function force_radiation(r, z, fm, wind::WindStruct ; include_tau_uv = false)
         #    abs_uv = 1.0
         #end
         #return [0.0, force_radiation(r, wind.config["radiation"]["constant_frad_height"], fm, wind, include_tau_uv = false)[2] * abs_uv]
-        println("FS r : $r, z: $z")
-        flush(stdout)
+        #println("FS r : $r, z: $z")
+        #flush(stdout)
         if z <= 1
-            @time int_values = integrate_fromstreamline(r, z, wind, include_tau_uv = include_tau_uv, maxevals=600)
-            #int_values = integrate_fromstreamline(r, z, wind, include_tau_uv = include_tau_uv, maxevals=600)
+            #@time int_values = integrate_fromstreamline(r, z, wind, include_tau_uv = include_tau_uv, maxevals=600)
+            int_values = integrate_fromstreamline(r, z, wind, include_tau_uv = include_tau_uv, maxevals=600)
         else
-            @time int_values = integrate_fromstreamline(r, z, wind, include_tau_uv = include_tau_uv, maxevals=300)
-            #int_values = integrate_fromstreamline(r, z, wind, include_tau_uv = include_tau_uv, maxevals=300)
+            #@time int_values = integrate_fromstreamline(r, z, wind, include_tau_uv = include_tau_uv, maxevals=300)
+            int_values = integrate_fromstreamline(r, z, wind, include_tau_uv = include_tau_uv, maxevals=300)
         end
-        println(int_values)
+        #println(int_values)
     else
-        println("N r : $r, z: $z")
-        flush(stdout)
+        #println("N r : $r, z: $z")
+        #flush(stdout)
         if z > 100.
-            @time int_values = integrate(r, z, wind, include_tau_uv=include_tau_uv, maxevals=600)
-            #int_values = integrate(r, z, wind, include_tau_uv=include_tau_uv, maxevals=600)
+            #@time int_values = integrate(r, z, wind, include_tau_uv=include_tau_uv, maxevals=600)
+            int_values = integrate(r, z, wind, include_tau_uv=include_tau_uv, maxevals=600)
         else
-            @time int_values = integrate(r, z, wind, include_tau_uv=include_tau_uv, maxevals=1000)
-            #int_values = integrate(r, z, wind, include_tau_uv=include_tau_uv, maxevals=1000)
+            #@time int_values = integrate(r, z, wind, include_tau_uv=include_tau_uv, maxevals=1000)
+            int_values = integrate(r, z, wind, include_tau_uv=include_tau_uv, maxevals=1000)
         end
         #int_values = integrate_parallel(r, z, wind, include_tau_uv=include_tau_uv)
-        println(int_values)
+        #println(int_values)
         if !all(isfinite.(int_values))
             println("NaN! changing coordinates...!!!!")
             println("FS r : $r, z: $z")
@@ -308,7 +308,7 @@ function force_radiation(r, z, fm, wind::WindStruct ; include_tau_uv = false)
     end
     @assert all(isfinite.(int_values))
     force_xr = force_xray(r, z, wind)
-    println("FX: $force_xr")
-    force = wind.radiation.force_constant * (1. + fm) * int_values + force_xr
+    #println("FX: $force_xr")
+    force = wind.radiation.force_constant * (1. + fm) * int_values #+ force_xr
     return force
 end

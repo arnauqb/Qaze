@@ -1,4 +1,6 @@
-export G, C, M_P, K_B, SIGMA_T, SIGMA_SB, M_SUN, YEAR_TO_SEC, SIGMA_E, K_INTERP_K_VALUES, K_INTERP_XI_VALUES, ETAMAX_INTERP_ETAMAX_VALUES, ETAMAX_INTERP_XI_VALUES
+export G, C, M_P, K_B, SIGMA_T, SIGMA_SB, M_SUN, YEAR_TO_SEC, SIGMA_E, 
+K_INTERP_K_VALUES, K_INTERP_XI_VALUES, ETAMAX_INTERP_ETAMAX_VALUES, ETAMAX_INTERP_XI_VALUES,
+SW, SE, NW, NE, N, S, W, E
 const G = 6.6743e-8
 const C = 29979245800.
 const M_P = 1.67262192369e-24
@@ -8,6 +10,15 @@ const SIGMA_E = SIGMA_T / M_P
 const SIGMA_SB = 5.6703744191844314e-05
 const M_SUN = 1.988409870698051e+33
 const YEAR_TO_SEC = 31557600.0
+
+const SW = 1
+const SE = 2  
+const NW = 3
+const NE = 4
+const N = 5
+const S = 6
+const W = 7
+const E = 8
 
 # interpolation values for force multiplier #
 const K_INTERP_XI_VALUES = [-4, -3, -2.26, -2.00, -1.50, -1.00,

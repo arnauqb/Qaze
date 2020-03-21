@@ -1,5 +1,4 @@
 module Qaze
-export initialize_line, start_lines
 using TOML
 include("Structures.jl")
 include("Config.jl")
