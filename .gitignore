@@ -7,3 +7,4 @@ profiling.jl
 *.h5
 *.jld
 *.mem
+*.jld2
