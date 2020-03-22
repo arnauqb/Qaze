@@ -115,8 +115,8 @@ function residual!(resid, du, u, line, t)
     a_T = sqrt(v_r_dot^2 + v_z_dot^2)
     dv_dr = a_T / v_T
     n = compute_density(r, z, v_T, line)
-    println("taux")
-    @time tau_x = compute_tau_x(r, z, line.wind)
+    #println("taux")
+    tau_x = compute_tau_x(r, z, line.wind)
     xi = ionization_parameter(r, z, n, tau_x, line.wind)
     tau_eff = compute_tau_eff(n, dv_dr, line.v_th)
     fm = force_multiplier(tau_eff, xi, line.wind)
@@ -195,14 +195,9 @@ function save(u, t, integrator)
     linewidth_normalized = integrator.p.line_width / integrator.p.r_0 
     currentpoint = [r, z]
     previouspoint = [r_0, z_0]
-    #println("r: $r z :$z")
-    #if abs(n_previous - n) / n_previous > 0.0 # only fill to grid if there is a 10% change in density
-    println("filling... ")
-    @time quadtree_fill_timestep(currentpoint, previouspoint, n, linewidth_normalized, integrator.p.line_id, integrator, integrator.p.wind)
+    println("r: $r z :$z")
     println("-----------------------------")
-    #end
-    #if evaluate(Euclidean(), currentpoint, previouspoint) > 
-
+    quadtree_fill_timestep(currentpoint, previouspoint, n, linewidth_normalized, integrator.p.line_id, integrator, integrator.p.wind)
     #println("filling ")
     #fill_and_refine!(previouspoint, currentpoint, linewidth_normalized, n_previous, fm, integrator.p.line_id, integrator.p.wind)
     #if length(integrator.p.n_hist) > 1
