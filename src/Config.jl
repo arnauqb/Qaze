@@ -97,7 +97,7 @@ function initialize_quadtree(config::Dict, bh::BlackHoleStruct, grids::GridsStru
     #                )
     quadtree = Cell(SVector(0., 0.), 
                     SVector(2 * quadtree_max_radius, 2* quadtree_max_height),
-                    CellData(0, Float64[], Float64[], 0, 0)
+                    CellData(Int64[], Float64[], Float64[], 0, 0)
                     #[0, Array{Float64}(undef, 2, 0), Float64[]] # line_id position density 
                     )
     return quadtree

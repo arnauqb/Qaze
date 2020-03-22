@@ -71,16 +71,17 @@ function compute_cell_intersection(currentpoint, cell::Cell, initialpoint, final
     ri == rf ? lambda_r=Inf : lambda_r=(cell_r_boundary - r) / (rf - ri)
     zi == zf ? lambda_z=Inf : lambda_z=(cell_z_boundary - z) / (zf - zi)
     lambda = min(lambda_r, lambda_z)
+    intersection = [r, z] + lambda .* [rf - ri, zf - zi]
     try
         @assert lambda >= 0.0
     catch
+        println("lambda: $lambda")
         println("current point : $currentpoint")
         println("cell: $cell")
         println("initial point: $initialpoint")
         println("final point: $finalpoint")
         throw(DomainError)
     end
-    intersection = [r, z] + lambda .* [rf - ri, zf - zi]
     return intersection
 end
 

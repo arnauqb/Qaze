@@ -21,7 +21,7 @@ export initialize_leaf,
 function initialize_leaf(cell, child_indices)
     #data = [0, Array{Float64}(undef, 2, 0), Float64[]] # line_id 0 -> vaccum
     #data = [0, Float64[], Float64[], 0] # line_id 0 -> vaccum
-    data = CellData(0, Float64[], Float64[], 0, 0)
+    data = CellData(Int[], Float64[], Float64[], 0, 0)
     return data
 end
 
@@ -84,7 +84,7 @@ function quadtree_initialize(wind)
     height = wind.config["grids"]["r_max"]
     wind.quadtree = Cell(SVector(0., 0.), 
                     SVector(2*height, 2*height),
-                    CellData(0, Float64[], Float64[], 0, 0)
+                    CellData(Int[], Float64[], Float64[], 0, 0)
                     #[0, Array{Float64}(undef, 2, 0), Float64[], 0] # line_id position density 
                     )
 end
@@ -100,16 +100,16 @@ end
 function quadtree_fill_point(point, zstep, density, line_id, line, wind; needs_refinement=true)
     leaf = findleaf(wind.quadtree, point)
     if line_id == 0 #erasing line
-        leaf.data.line_id = 0
+        leaf.data.line_id = Int[]
         leaf.data.z_positions = Float64[]
         leaf.data.densities = Float64[]
         leaf.data.z_max = 0.0
         leaf.data.direction = 0
         return leaf
     end
-    if leaf.data.line_id == 0 # empty cell
+    if length(leaf.data.line_id) == 0 # empty cell
         leaf = refine_leaf(point, leaf, zstep, wind)
-        leaf.data.line_id = line_id
+        push!(leaf.data.line_id, line_id)
         push!(leaf.data.z_positions, point[2])
         push!(leaf.data.densities, density)
         leaf.data.z_max = maximum(line.p.u_hist[:,2]) #point[2]
@@ -126,6 +126,7 @@ function quadtree_fill_point(point, zstep, density, line_id, line, wind; needs_r
         else
             leaf.data.direction = -1
         end
+        push!(leaf.data.line_id, line_id)
         push!(leaf.data.z_positions, point[2])
         push!(leaf.data.densities, density)
         leaf.data.z_max = max(point[2], leaf.data.z_max)
@@ -137,6 +138,7 @@ function quadtree_fill_point(point, zstep, density, line_id, line, wind; needs_r
     if ((leaf.data.direction==-1) && (point[2]>leaf.data.z_positions[end]))
         return leaf
     end
+    push!(leaf.data.line_id, line_id)
     push!(leaf.data.z_positions, point[2])
     push!(leaf.data.densities, density)
     leaf.data.z_max = max(point[2], leaf.data.z_max)
@@ -164,8 +166,8 @@ function quadtree_fill_timestep(point1, point2, density, linewidthnorm, line_id,
     zstep = min(max(height, wind.config["grids"]["minimum_cell_size"]), linewidthnorm * point1[1])
     interp_density(d2) = density #/ d2 * d02 
     while true
-        rleft = max(currentpoint[1] * (1 - linewidthnorm/2), 6)
-        rright = max(currentpoint[1] * (1 + linewidthnorm/2), 6)
+        rleft = currentpoint[1] * (1 - linewidthnorm/2)
+        rright = currentpoint[1] * (1 + linewidthnorm/2)
         d2 = currentpoint[1]^2 + currentpoint[2]^2
         quadtree_fill_horizontal(rleft, rright, currentpoint[2], zstep, interp_density(d2), line_id, line, wind, true)
         currentleaf = findleaf(wind.quadtree, currentpoint)
@@ -221,35 +223,23 @@ end
 
 function quadtree_density(point, wind)
     leaf = findleaf(wind.quadtree, point)
-    if leaf.data.line_id == 0
-        return wind.grids.n_vacuum
-    end
     line = wind.lines[leaf.data.line_id]
     interpolate_density(line, point, leaf, wind)
 end
 
 function interpolate_density(line, point, leaf, wind)
-    if point[2] > leaf.data.z_max
+    println(leaf.data)
+    if length(leaf.data.line_id) == 0
         return wind.grids.n_vacuum
     end
     idx = get_index(leaf.data.z_positions, point[2])
+    line_id = leaf.data.line_id[idx]
+    println(line_id)
+    if point[2] > maximum(wind.lines[line_id].p.u_hist[:,2]) #leaf.data.z_max
+        return wind.grids.n_vacuum
+    end
     n = leaf.data.densities[idx]
     return n
-    #X = leaf.data[2] #line.p.u_hist[:,1:2]
-    #densities = leaf.data[3]
-    #z_max = maximum(X[2,:])
-    ##if point[2] > z_max
-    ##    return wind.grids.n_vacuum
-    ##end
-    #point = reshape(point, 2, 1)
-    #distances = pairwise(Euclidean(), point, X, dims=2)
-    #closest = argmin(distances)[2]
-    #distance = distances[closest]
-    #if (abs(point[1] - X[1, closest])) > (X[1, closest] * line.p.line_width / line.p.r_0 / 2)
-    #    return wind.grids.n_vacuum
-    #end
-    #n = densities[closest]
-    #return n
 end
 
 function interpolate_density(line_id::Int, point, leaf, wind)

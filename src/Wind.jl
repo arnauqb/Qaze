@@ -4,7 +4,7 @@ using JLD2
 export initialize_line!, start_lines!, compute_line_mdot, compute_wind_mdot,
        compute_kinetic_luminosity, compute_maximum_velocity, start_iteration!, start_line!
 
-function intialize_line!(i::Int, wind::WindStruct)
+function initialize_line!(i::Int, wind::WindStruct)
     r = wind.lines_range[i]
     return initialize_line!(i , r, wind)
 end
@@ -77,8 +77,8 @@ function start_iteration!(it_num, wind::WindStruct, from_line = 1, until_line=no
             continue
         end
         line = start_line!(i, r_0, wind)
-        println("filling and refining line...")
-        quadtree_fill_line(line, i, wind)
+        #println("filling and refining line...")
+        #quadtree_fill_line(line, i, wind)
         #fill_and_refine_line!(line, i, wind)
         write_line(wind.config["general"]["save_path"], line.p, it_num)
         #if (i+1) % 3 == 0

@@ -195,8 +195,6 @@ end
 
 #### experimental ######
 
-
-
 function integrate_fromstreamline_notau_kernel(v, p, psi, r, z, wind, r_max)
     cosψ = cos(psi)
     r_d = sqrt(r^2 + p^2 - 2 * p * r * cosψ)

@@ -80,7 +80,7 @@ mutable struct StreamlineStruct
 end
 
 mutable struct CellData
-    line_id::Int
+    line_id::Array{Int,1}
     z_positions::Array{Float64, 1}
     densities::Array{Float64, 1}
     z_max::Float64
