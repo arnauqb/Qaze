@@ -81,7 +81,7 @@ end
 
 mutable struct CellData
     line_id::Array{Int,1}
-    z_positions::Array{Float64, 1}
+    positions::Array{Float64, 2}
     densities::Array{Float64, 1}
     z_max::Float64
     direction::Int # 1 up, -1 down, 0 undecided
