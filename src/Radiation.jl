@@ -51,6 +51,9 @@ function update_mdot_grid!(wind::WindStruct)
         j = length(wind.lines) - i
         isassigned(wind.lines, j) || continue
         line = wind.lines[j]
+        if line === nothing
+            continue
+        end
         r_0 = line.p.r_0
         width = line.p.line_width
         rmin_arg = get_index(wind.grids.disk_range, r_0 - width/2.)
@@ -116,9 +119,11 @@ function compute_taux_leaf(point, intersection, taux0, leaf, wind::WindStruct)
     deltad = distance2d(point, intersection) * wind.bh.R_g # cell size
     d = distance2d([0.,wind.z_0], intersection) * wind.bh.R_g # distance from the center
     cellheight = cell_width(leaf)
-    density = interpolate_density(leaf.data.line_id, point, leaf, wind) #leaf.data[1] / leaf.data[2] 
-    xi0 = wind.radiation.xray_luminosity / (density * d^2)
-    f(t) = t - log(xi0) - taux0 + min(40, deltad * density * opacity_x(exp(t)) * SIGMA_T)
+    #density = interpolate_density(leaf.data.line_id, point, leaf, wind) #leaf.data[1] / leaf.data[2] 
+    deltatau = compute_tau_cell(point, intersection, leaf, wind) * wind.bh.R_g
+    n_eff = quadtree_effective_density(point, intersection, wind)
+    xi0 = wind.radiation.xray_luminosity / (n_eff* d^2)
+    f(t) = t - log(xi0) - taux0 + min(40, deltatau * opacity_x(exp(t)) * SIGMA_T)
     if f(20) < 0
         xi = xi0 
     elseif f(-20) > 0
@@ -127,7 +132,7 @@ function compute_taux_leaf(point, intersection, taux0, leaf, wind::WindStruct)
         t = find_zero(f, (-20, 20), Bisection(), atol=0, rtol=0.1)
         xi = exp(t)
     end
-    taux = density * opacity_x(xi) * deltad * SIGMA_T
+    taux = opacity_x(xi) * deltatau * SIGMA_T
     return taux
 end
 
@@ -138,6 +143,7 @@ following the lightray direction (0,0) -> (r,z). At each cell,
 we consistently compute tau_x and the ionization parameter.
 """
 function compute_tau_x(r, z, wind::WindStruct)
+    return 40
     z = max(z, wind.z_0)
     @assert z >= 0
     point1 = [0.0, wind.z_0]

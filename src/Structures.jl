@@ -1,7 +1,9 @@
 using PyCall
 using RegionTrees: AbstractRefinery, Cell
 using Interpolations
-export GridsStruct, BlackHoleStruct, RadiationStruct, StreamlineStruct, WindStruct, CellData
+using VoronoiDelaunay
+import VoronoiDelaunay: getx, gety
+export GridsStruct, BlackHoleStruct, RadiationStruct, StreamlineStruct, WindStruct, CellData, CustomPoint
 
 struct GridsStruct
     n_disk::Int64
@@ -40,12 +42,26 @@ mutable struct RadiationStruct
     include_fm_tauuv::Bool
 end
 
+struct CustomPoint <: AbstractPoint2D
+    _x::Float64
+    _y::Float64
+    _density::Float64
+    _linewidth::Float64
+    _type::String
+    _m::Float64
+    _n::Float64
+end
+CustomPoint(x::Float64, y::Float64) = CustomPoint(x, y, 1e2, 0.0, "out", 0.0, 0.0)
+getx(p::CustomPoint) = p._x
+gety(p::CustomPoint) = p._y
+
 mutable struct WindStruct
     config::Dict
     bh::BlackHoleStruct
     sed::PyObject
     grids::GridsStruct
     quadtree::Cell
+    tessellation::DelaunayTessellation2D{CustomPoint}
     radiation::RadiationStruct
     lines::Array{Any,1}
     interpolators::Array{Any, 1}
@@ -53,6 +69,8 @@ mutable struct WindStruct
     lines_range::Array{Float64,1}
     lines_widths::Array{Float64,1}
     z_0::Float64
+    r_max::Float64
+    z_max::Float64
 end
 
 mutable struct StreamlineStruct
@@ -83,6 +101,7 @@ mutable struct CellData
     line_id::Array{Int,1}
     z_positions::Array{Float64, 1}
     densities::Array{Float64, 1}
-    z_max::Float64
-    direction::Int # 1 up, -1 down, 0 undecided
+    taus::Array{Float64, 1}
+    #z_max::Float64
+    #direction::Int # 1 up, -1 down, 0 undecided
 end

@@ -1,8 +1,8 @@
 title = "Qwind config file"
 
 [general]
-save_path = "cell01.json"
-save_jld2 = "cell01.jld2"
+save_path = "base_self.json"
+save_jld2 = "base_self.jld2"
 verbosity = 0
 
 [bh]
@@ -25,7 +25,7 @@ n_r_disk = 3000
 n_vacuum = 1e2
 tree_initial_divisions = 2
 cell_optical_thickness = 0.1
-minimum_cell_size = 0.1
+minimum_cell_size = 1
 
 [radiation]
 f_uv = "auto" 
@@ -43,7 +43,7 @@ cak_K = 0.03
 [wind]
 initial_radius = 6.0 
 final_radius = 1000.0
-number_streamlines = 70
+number_streamlines = 50
 iterations = 8
 log_spaced = true 
 wind_temperature = 2.5e4 

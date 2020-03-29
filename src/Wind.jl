@@ -9,7 +9,11 @@ function initialize_line!(i::Int, wind::WindStruct)
     return initialize_line!(i , r, wind)
 end
 
-function initialize_line!(i, r, wind::WindStruct)
+function initialize_line!(i, r, wind::WindStruct ; nolaunch=false)
+    if nolaunch
+        line_integ = initialize_line!(i, r, 0, 1e-5, 1e8, 1e-5, wind)
+        return line_integ
+    end
     T = wind.sed.disk_nt_temperature4(r)^(0.25)
     v_th = thermal_velocity(T)
     if wind.config["wind"]["v_0"] == "thermal"
@@ -55,12 +59,18 @@ function start_iteration!(it_num, wind::WindStruct, from_line = 1, until_line=no
         if i > until_line
             break
         end
+        r0_idx = get_index(wind.grids.disk_range, r_0)
+        if wind.grids.mdot[r0_idx] <= 0
+            wind.lines[i] = initialize_line!(i, r_0, wind, nolaunch=true)#nothing
+            continue
+        end
+
         if it_num > 1
             println("erasing line...")
             flush(stdout)
             quadtree_initialize(wind)
             for (j, line) in enumerate(wind.lines)
-                if j == i
+                if j == i 
                     continue
                 end
                 println("filling line $j of $(length(wind.lines))")
@@ -71,11 +81,6 @@ function start_iteration!(it_num, wind::WindStruct, from_line = 1, until_line=no
             #quadtree_erase_line(i, wind)
         end
         # check if there is mass to launch the line
-        r0_idx = get_index(wind.grids.disk_range, r_0)
-        if wind.grids.mdot[r0_idx] <= 0
-            wind.lines[i] = nothing
-            continue
-        end
         line = start_line!(i, r_0, wind)
         #println("filling and refining line...")
         #quadtree_fill_line(line, i, wind)

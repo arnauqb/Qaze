@@ -38,7 +38,7 @@ a=0
 boost by the force multiplier."
 function compute_tauuv_leaf(point, intersection, leaf, wind)
     deltad = distance2d(point, intersection) #* wind.bh.R_g
-    tauuv = deltad * interpolate_density(leaf.data.line_id, point, leaf, wind)
+    tauuv = compute_tau_cell(point, intersection, leaf, wind) #deltad * interpolate_density(leaf.data.line_id, point, leaf, wind)
     return tauuv
 end
 

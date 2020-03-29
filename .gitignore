@@ -8,3 +8,4 @@ profiling.jl
 *.jld
 *.mem
 *.jld2
+venv/

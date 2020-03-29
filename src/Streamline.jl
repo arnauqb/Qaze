@@ -149,7 +149,7 @@ function condition(u, t, integrator)
     #    end
     #end
 
-    stalling_condition = compute_stalling_condition(integrator, 1000)
+    stalling_condition = compute_stalling_condition(integrator, 5000)
     if (z < 0.2 * maximum(integrator.p.u_hist[:,2])) && (length(integrator.p.u_hist) > 500) || (length(integrator.p.u_hist) > 5000 )
         stalling_condition = true
     end
@@ -195,9 +195,9 @@ function save(u, t, integrator)
     linewidth_normalized = integrator.p.line_width / integrator.p.r_0 
     currentpoint = [r, z]
     previouspoint = [r_0, z_0]
-    println("r: $r z :$z")
-    println("-----------------------------")
-    quadtree_fill_timestep(currentpoint, previouspoint, n, linewidth_normalized, integrator.p.line_id, integrator, integrator.p.wind)
+    if z != 0
+        quadtree_fill_timestep(currentpoint, previouspoint, n, linewidth_normalized, integrator.p.line_id, integrator, integrator.p.wind)
+    end
     #println("filling ")
     #fill_and_refine!(previouspoint, currentpoint, linewidth_normalized, n_previous, fm, integrator.p.line_id, integrator.p.wind)
     #if length(integrator.p.n_hist) > 1
