@@ -143,7 +143,7 @@ following the lightray direction (0,0) -> (r,z). At each cell,
 we consistently compute tau_x and the ionization parameter.
 """
 function compute_tau_x(r, z, wind::WindStruct)
-    return 40
+    #return 40
     z = max(z, wind.z_0)
     @assert z >= 0
     point1 = [0.0, wind.z_0]
@@ -172,7 +172,9 @@ function compute_tau_x(r, z, wind::WindStruct)
         currentpoint = intersection
         currentleaf = findleaf(wind.quadtree, currentpoint)
     end
-    taux += compute_taux_leaf(currentpoint, point2, taux, currentleaf, wind)
+    if currentpoint[2] < point2[2]
+        taux += compute_taux_leaf(currentpoint, point2, taux, currentleaf, wind)
+    end
     return taux
     #push!(coords_list, point2)
     #if return_coords

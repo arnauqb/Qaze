@@ -64,7 +64,7 @@ function plot_density(wind; xl=0, xh=3000, yl=0, yh=3000, grid=true, depth = 4, 
     z_range = range(yl, stop=yh, length=nz+1)
     for (i, r) in enumerate(r_range[1:end-1])
         for (j, z) in enumerate(z_range[1:end-1])
-            #leaf = findleaf(wind.quadtree, [r,z])
+            leaf = findleaf(wind.quadtree, [r,z])
             #line_id = leaf.data.line_id
             #if line_id == 0
             #    dens = 1e2#1e2
@@ -73,11 +73,16 @@ function plot_density(wind; xl=0, xh=3000, yl=0, yh=3000, grid=true, depth = 4, 
             #    dens = quadtree_effective_density(leaf.boundary.origin, leaf.boundary.origin .+ leaf.boundary.widths, wind) #interpolate_density(wind.lines[line_id], [r,z], leaf, wind)
             #end
             #dens = leaf.data[1]
-            grid_den[i,j] = tess_density(r, z, wind)
+            if length(leaf.data.line_id) == 0
+                den = 0#1e2
+            else
+                den = leaf.data.line_id[1]#tess_density(r, z, wind)
+            end
+            grid_den[i,j] = den
             #grid_den[i,j] = dens
         end
     end
-    cm = ax.pcolormesh(r_range, z_range, grid_den', norm=LogNorm(vmin=vmin, vmax=vmax))
+    cm = ax.pcolormesh(r_range, z_range, grid_den')#, norm=LogNorm(vmin=vmin, vmax=vmax))
     #heatmap(grid_den')
     if grid 
         plot_grid(wind.quadtree, depth, ax, xl, xh, yl, yh)
@@ -93,6 +98,14 @@ function plot_density(wind; xl=0, xh=3000, yl=0, yh=3000, grid=true, depth = 4, 
     return fig, ax
 end
 
+function plot_density_line(wind, line; grid=true, depth = 4, nr=250, nz=251, vmin=nothing, vmax=nothing, ax = nothing, fig=nothing)
+    xl = minimum(line.p.u_hist[:,1])
+    xh = maximum(line.p.u_hist[:,1])
+    yl = minimum(line.p.u_hist[:,2])
+    yh = maximum(line.p.u_hist[:,2])
+    return plot_density(wind, xl=xl, xh=xh, yl=yl, yh=yh, grid=grid, depth=depth, nr=nr, nz=nz, vmin=vmin, vmax=vmax, ax=ax, fig=fig)
+end
+
 function plot_linewidth(line, ax=nothing)
     if ax === nothing
         fig, ax = PyPlot.plt.subplots()
@@ -101,8 +114,8 @@ function plot_linewidth(line, ax=nothing)
     z_hist = line.p.u_hist[:,2]
     lwhist = line.p.line_width / line.p.r_0 .* r_hist ./ 2
     ax.plot(r_hist, z_hist, "o-", markersize=3, color = "black")
-    ax.plot(r_hist .- lwhist, z_hist, "o-", markersize=3, color = "white", alpha=0.5)
-    ax.plot(r_hist .+ lwhist, z_hist, "o-", markersize=3, color = "white", alpha=0.5)
+    ax.plot(r_hist .- lwhist, z_hist, "o-", markersize=3, color = "maroon", alpha=0.5)
+    ax.plot(r_hist .+ lwhist, z_hist, "o-", markersize=3, color = "maroon", alpha=0.5)
     return ax
 end
 

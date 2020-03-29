@@ -18,6 +18,7 @@ export initialize_leaf,
        quadtree_effective_density,
        test_interp,
        fill_last_point,
+       countleaves,
        normalize_point,
        denormalize_point,
        create_tessellation,
@@ -165,26 +166,31 @@ function quadtree_fill_timestep(point1, point2, density, linewidthnorm, line_id,
     if z2 < z1
         point1[2], point2[2] = point2[2], point1[2]#z1, z2 = z2, z1
     end
-    r1 > r2 ? backwards = true : backwards = false
+    if r2 < r1
+        point1[1], point2[1] = point2[1], point1[1]#z1, z2 = z2, z1
+    end
+    #r1 > r2 ? backwards = true : backwards = false
     currentleaf = findleaf(wind.quadtree, point1)
     previousleaf = copy(currentleaf)
     currentpoint = copy(point1)
     height = abs(point2[2] - point1[2])#point1[2] / 100 
-    zstep = min(max(height, wind.config["grids"]["minimum_cell_size"]), linewidthnorm * point1[1])
+    zstep = min(max(height, wind.config["grids"]["minimum_cell_size"]), linewidthnorm * point1[1] / 2.0)
     while true
         rleft = currentpoint[1] * (1 - linewidthnorm/2)
         rright = currentpoint[1] * (1 + linewidthnorm/2)
-        d2 = currentpoint[1]^2 + currentpoint[2]^2
         quadtree_fill_horizontal(rleft, rright, currentpoint[2], zstep, density, line_id, line, wind, true)
         currentleaf = findleaf(wind.quadtree, currentpoint)
         currentpoint = compute_cell_intersection(currentpoint, currentleaf, point1, point2)
-        backwards && (currentpoint[1] -= 1e-8)
+        #backwards && (currentpoint[1] -= 1e-8)
         currentleaf = findleaf(wind.quadtree, currentpoint)
         if currentpoint[2] > point2[2] || previousleaf == currentleaf
             break
         end
         previousleaf = currentleaf
     end
+    rleft = point2[1] * (1 - linewidthnorm/2)
+    rright = point2[1] * (1 + linewidthnorm/2)
+    quadtree_fill_horizontal(rleft, rright, point2[2], zstep, density, line_id, line, wind, true)
 end
 
 function quadtree_fill_horizontal(rleft, rright, z, zstep, density, line_id, line, wind, needs_refinement=true)
@@ -245,7 +251,14 @@ function compute_tau_cell(point1, point2, leaf, wind)
     if point1[2] == point2[2]
         return 0
     end
-    @assert point2[2] > point1[2]
+    try
+        @assert point2[2] > point1[2]
+    catch
+        println(point1)
+        println(point2)
+        println(leaf)
+        throw(DomainError)
+    end
     deltad = evaluate(Euclidean(), point1, point2)
     if length(leaf.data.line_id) == 0
         return wind.grids.n_vacuum * deltad
@@ -261,14 +274,6 @@ function compute_tau_cell(point1, point2, leaf, wind)
     @assert deltatau >= 0
     tau = deltatau / deltaz * deltad
     return tau
-     
-    #idx = get_index(leaf.data.z_positions, point[2])
-    #line_id = leaf.data.line_id[idx]
-    #if point[2] > maximum(wind.lines[line_id].p.u_hist[:,2]) #leaf.data.z_max
-    #    return wind.grids.n_vacuum
-    #end
-    #n = leaf.data.densities[idx]
-    #return n
 end
 
 function fill_last_point(line)
@@ -279,6 +284,14 @@ function fill_last_point(line)
     line_id = line.p.line_id
     wind = line.p.wind
     quadtree_fill_timestep(currentpoint, previouspoint, density, lwnorm, line_id, line, wind)
+end
+
+function countleaves(wind)
+    counter = 0
+    for leaf in allleaves(wind.quadtree)
+        counter += 1
+    end
+    return counter
 end
 
 function initialize_tessellation(wind)

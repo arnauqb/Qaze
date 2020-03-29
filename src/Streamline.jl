@@ -150,9 +150,9 @@ function condition(u, t, integrator)
     #end
 
     stalling_condition = compute_stalling_condition(integrator, 5000)
-    if (z < 0.2 * maximum(integrator.p.u_hist[:,2])) && (length(integrator.p.u_hist) > 500) || (length(integrator.p.u_hist) > 5000 )
-        stalling_condition = true
-    end
+    #if (z < 0.2 * maximum(integrator.p.u_hist[:,2])) && (length(integrator.p.u_hist) > 500) || (length(integrator.p.u_hist) > 5000 )
+    #    stalling_condition = true
+    #end
     escaped_condition = (r >= integrator.p.wind.grids.r_max) || (z >= integrator.p.wind.grids.z_max)
     #escaped_condition && (integrator.p.outofdomain=true)
     failed_condtion = ((z <  integrator.p.wind.z_0) && (v_z < 0)) || r < 0.
@@ -174,8 +174,9 @@ end
 "Saves current iteration data"
 function save(u, t, integrator)
     #println("save")
-    #println("=======")
     r, z, v_r, v_z = u
+    println("=======")
+    println("r : $r, z: $z")
     if any([r,z] .< 0)
         terminate!(integrator)
         return u
@@ -196,7 +197,7 @@ function save(u, t, integrator)
     currentpoint = [r, z]
     previouspoint = [r_0, z_0]
     if z != 0
-        quadtree_fill_timestep(currentpoint, previouspoint, n, linewidth_normalized, integrator.p.line_id, integrator, integrator.p.wind)
+        quadtree_fill_timestep(previouspoint, currentpoint, n, linewidth_normalized, integrator.p.line_id, integrator, integrator.p.wind)
     end
     #println("filling ")
     #fill_and_refine!(previouspoint, currentpoint, linewidth_normalized, n_previous, fm, integrator.p.line_id, integrator.p.wind)
