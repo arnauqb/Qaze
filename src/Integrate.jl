@@ -37,7 +37,7 @@ a=0
 "Computes the UV optical depth inside a leaf, taking into account the opacity
 boost by the force multiplier."
 function compute_tauuv_leaf(point, intersection, leaf, wind)
-    deltad = distance2d(point, intersection) #* wind.bh.R_g
+    #deltad = distance2d(point, intersection) #* wind.bh.R_g
     tauuv = compute_tau_cell(point, intersection, leaf, wind) #deltad * interpolate_density(leaf.data.line_id, point, leaf, wind)
     return tauuv
 end
@@ -47,11 +47,16 @@ function compute_delta2(r_d, phi_d, r, z)
     return max(delta, 0.) # sometimes it overflows...
 end
 
+
+#tau_coords_r = []
+#tau_coords_z = []
 """
 Compute the UV optical depth from a disc patch located at (r_d, phi_d),
 until a gas element at (r,z). 
 """
 function tau_uv_disk_blob(r_d, r, z, wind, maxtau)
+    tau_coords_r = Float64[]
+    tau_coords_z = Float64[]
     r_d > r ? backwards = true : backwards = false
     point1 = [r_d, 0.0]
     point1leaf = findleaf(wind.quadtree, point1)
@@ -61,21 +66,38 @@ function tau_uv_disk_blob(r_d, r, z, wind, maxtau)
         tauuv = compute_tauuv_leaf(point1, point2, point1leaf, wind)
         return tauuv
     end
-    intersection = compute_cell_intersection(point1, point1leaf, point1, point2)
-    tauuv = compute_tauuv_leaf(point1, intersection, point1leaf, wind)
-    currentpoint = intersection
-    backwards && (currentpoint[1] -= 1e-8)
-    currentleaf = findleaf(wind.quadtree, currentpoint)
-    while currentleaf != point2leaf
+    currentleaf = point1leaf
+    currentpoint = point1
+    previousleaf = copy(currentleaf)
+    tauuv = 0.0
+    #intersection = compute_cell_intersection(point1, point1leaf, point1, point2)
+    #tauuv = compute_tauuv_leaf(point1, intersection, point1leaf, wind)
+    #currentpoint = intersection
+    #backwards && (currentpoint[1] -= 1e-8)
+    #currentleaf = findleaf(wind.quadtree, currentpoint)
+    #previousleaf = copy(currentleaf)
+    while (currentleaf != point2leaf) && (currentpoint[2] <= point2[2])
         intersection = compute_cell_intersection(currentpoint, currentleaf, point1, point2)
+        push!(tau_coords_r, intersection[1])
+        push!(tau_coords_z, intersection[2])
+        #println("intersection : $intersection")
         tauuv += compute_tauuv_leaf(currentpoint, intersection, currentleaf, wind)
         tauuv >= maxtau && return tauuv
         currentpoint = intersection
-        backwards && (currentpoint[1] -= 1e-8)
+        if currentpoint == point2
+            return tauuv
+        end
+        backwards && (currentpoint[1] -= 1e-10)
         currentleaf = findleaf(wind.quadtree, currentpoint)
+        if currentleaf == previousleaf
+            break
+        end
+        previousleaf = copy(currentleaf)
     end
-    tauuv += compute_tauuv_leaf(currentpoint, point2, currentleaf, wind)
-    return tauuv
+    if currentpoint[2] < point2[2]
+        tauuv += compute_tauuv_leaf(currentpoint, point2, currentleaf, wind)
+    end
+    return tauuv#, tau_coords_r, tau_coords_z
 end
 
 function integrate_kernel(v, r_d, phi_d, r, z, wind, rgsigma, maxtau)

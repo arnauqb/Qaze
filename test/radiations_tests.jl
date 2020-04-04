@@ -13,20 +13,6 @@ end
     @test opacity_x(1e6) == 1
 end
 
-@testset "X-ray optical depth" begin
-    #r_range = [10, 10, 50, 100, 900]
-    #z_range = [5, 5, 20, 800, 5]
-    r_range = range(1, stop=1000, length=50)
-    z_range = range(1e-4, stop=1000, length=50)
-    for r in r_range
-        for z in z_range
-            tau_truth = wind.grids.n_vacuum * sqrt.(r^2 + (z - wind.z_0)^2) * SIGMA_T * wind.bh.R_g
-            tauuv = compute_tau_x(r, z, wind)
-            @test tauuv ≈ tau_truth rtol=1e-2 atol=0
-        end
-    end
-end
-
 @testset "Ionization Parameter" begin
     r_range = [5, 100, 500, 1000]
     z_range = [10, 50, 1000, 5]
@@ -38,17 +24,17 @@ end
 end
 
 @testset "Force multiplier" begin
-    @test force_multiplier(1e5, 1e5) < 1e-3
-    @test force_multiplier(1e5, 1e-5) < 1e-3
-    @test force_multiplier(1e-8, 1e-5) > 2000
-    @test force_multiplier(1e-8, 1e-5) < 3000
-    @test force_multiplier(1e-10, 1e-5) ≈ 2300 atol=0 rtol = 0.1
-    @test force_multiplier(1e-2, 1e-5) ≈ 6 atol=0 rtol = 0.1
+    @test force_multiplier(1e5, 1e5, wind) < 1e-3
+    @test force_multiplier(1e5, 1e-5, wind) < 1e-3
+    @test force_multiplier(1e-8, 1e-5, wind) > 2000
+    @test force_multiplier(1e-8, 1e-5, wind) < 3000
+    @test force_multiplier(1e-10, 1e-5, wind) ≈ 2300 atol=0 rtol = 0.1
+    @test force_multiplier(1e-2, 1e-5, wind) ≈ 6 atol=0 rtol = 0.1
 end
 
 @testset "Force radiation" begin
-    @test all(isapprox.(force_radiation(100., 50., 0., wind, include_tau_uv=false), [5e-6, 4.2e-6], atol=0, rtol=0.1))
-    @test all(isapprox.(force_radiation(5., 10., 0., wind, include_tau_uv=false), [-7e-6, 6e-5], atol=0, rtol=0.1))
+    @test all(isapprox.(integrate(100., 50., wind, include_tau_uv=false, maxevals=10000), [2.4e-6, 2e-6], atol=0, rtol=0.1))
+    @test all(isapprox.(integrate(5., 10., wind, include_tau_uv=false, maxevals=10000), [-3.3e-6, 3e-5], atol=0, rtol=0.1))
     #@test all(isapprox.(force_radiation(1000., 0.1, 0., wind, include_tau_uv=false), [1.9e-11, 9e-11], atol=0, rtol=0.2))
 end
 

@@ -162,6 +162,7 @@ function compute_tau_x(r, z, wind::WindStruct)
     currentpoint = intersection
     #push!(coords_list, intersection)
     currentleaf = findleaf(wind.quadtree, currentpoint)
+    previousleaf = copy(currentleaf)
     while currentleaf != point2leaf
         intersection = compute_cell_intersection(currentpoint, currentleaf, point1, point2)
         #push!(coords_list, intersection)
@@ -171,6 +172,9 @@ function compute_tau_x(r, z, wind::WindStruct)
         #end
         currentpoint = intersection
         currentleaf = findleaf(wind.quadtree, currentpoint)
+        if currentleaf == previousleaf
+            break
+        end
     end
     if currentpoint[2] < point2[2]
         taux += compute_taux_leaf(currentpoint, point2, taux, currentleaf, wind)

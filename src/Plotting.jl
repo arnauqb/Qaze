@@ -23,7 +23,7 @@ function plot_cell(ax, cell, xl, xh, yl, yh)
     ax.plot(x,y, color="black", alpha=0.3)
 end
 
-function plot_grid(quadtree, depth, ax=nothing, xl=0, xh=1000, yl=0, yh=1000)
+function plot_grid(quadtree, depth ; ax=nothing, xl=0, xh=1000, yl=0, yh=1000)
     if ax === nothing
         fig, ax = PyPlot.plt.subplots()
     end
@@ -50,6 +50,8 @@ function plot_grid(quadtree, depth, ax=nothing, xl=0, xh=1000, yl=0, yh=1000)
         dp -= 1
     end
     plot_cell.(Ref(ax), children_list, xl, xh, yl, yh)
+    ax.set_xlim(xl, xh)
+    ax.set_ylim(yl, yh)
     return ax
 end
 
@@ -85,7 +87,7 @@ function plot_density(wind; xl=0, xh=3000, yl=0, yh=3000, grid=true, depth = 4, 
     cm = ax.pcolormesh(r_range, z_range, grid_den')#, norm=LogNorm(vmin=vmin, vmax=vmax))
     #heatmap(grid_den')
     if grid 
-        plot_grid(wind.quadtree, depth, ax, xl, xh, yl, yh)
+        plot_grid(wind.quadtree, depth; ax=ax, xl=xl, xh=xh, yl=yl, yh=yh)
     end
     if first
         fig.colorbar(cm, ax=ax)
@@ -174,7 +176,7 @@ function plot_taux(wind; xl=0, xh=3000, yl=0, yh=3000, grid=true, depth = 4, nr=
     cm = ax.pcolormesh(r_range, z_range, grid_den', norm=LogNorm(vmin=vmin, vmax=vmax))
     #heatmap(grid_den')
     if grid 
-        plot_grid(wind.quadtree, depth, ax, xl, xh, yl, yh)
+        plot_grid(wind.quadtree, depth; ax=ax, xl=xl, xh=xh, yl=yl, yh=yh)
     end
     if first
         fig.colorbar(cm, ax=ax)

@@ -12,18 +12,19 @@ export initialize_leaf,
        quadtree_fill_timestep,
        quadtree_fill_line,
        quadtree_fill_all_lines,
+       quadtree_fill_horizontal,
        quadtree_erase_line,
        compute_tau_cell,
        quadtree_deltatau,
        quadtree_effective_density,
-       test_interp,
        fill_last_point,
        countleaves,
        normalize_point,
        denormalize_point,
        create_tessellation,
        initialize_tessellation,
-       tess_density
+       tess_density,
+       compute_accumulative_taus
 
 
 
@@ -109,17 +110,10 @@ end
 function compute_accumulative_taus(z_positions, densities, z0)
     taus = zero(densities)
     taus[1] = densities[1] * (z_positions[1] - z0)
-    try
-        @assert(taus[1]>=0)
-    catch
-        println("zposi: $z_positions")
-        println("denss: $densities")
-        println("z0 : $z0")
-        @assert(taus[1]>=0)
-    end
+    @assert(taus[1]>=0)
     tautotal = taus[1]
     for i in 2:length(taus)
-        tautotal += densities[i] * (z_positions[i] - z_positions[i-1])
+        tautotal += densities[i-1] * (z_positions[i] - z_positions[i-1])
         taus[i] = tautotal
         @assert(taus[i]>=0)
     end
@@ -129,28 +123,52 @@ end
 function quadtree_fill_point(point, zstep, density, line_id, line, wind; needs_refinement=true)
     leaf = findleaf(wind.quadtree, point)
     z0 = leaf.boundary.origin[2]
+    try
+        @assert z0 <= point[2]
+    catch
+        println("z0 lower than point???")
+        println("point: $point")
+        println("leaf: $leaf")
+        throw(DomainError)
+    end
     #if line_id == 0 #erasing line
     #    leaf.data.line_id = Int[]
     #    leaf.data.z_positions = Float64[]
     #    leaf.data.densities = Float64[]
     #    return leaf
     #end
-    if length(leaf.data.line_id) == 0 # empty cell
+    if length(leaf.data.line_id) == 0 && needs_refinement # empty cell
         leaf = refine_leaf(point, leaf, zstep, wind)
+        z0 = leaf.boundary.origin[2]
         push!(leaf.data.line_id, line_id)
         push!(leaf.data.z_positions, point[2])
         push!(leaf.data.densities, density)
-        push!(leaf.data.taus, abs(point[2] - z0) * density)
+        push!(leaf.data.taus, (point[2] - z0) * density)
         return leaf
     end
-
     push!(leaf.data.line_id, line_id)
     push!(leaf.data.z_positions, point[2])
     push!(leaf.data.densities, density)
     sorting_idx = sortperm(leaf.data.z_positions)
     leaf.data.line_id = leaf.data.line_id[sorting_idx]
     leaf.data.z_positions = leaf.data.z_positions[sorting_idx]
-    leaf.data.taus = compute_accumulative_taus(leaf.data.z_positions, leaf.data.densities, z0) 
+    leaf.data.densities = leaf.data.densities[sorting_idx]
+    try
+        @assert z0 <= leaf.data.z_positions[1]
+    catch
+        println("leaf: $leaf")
+        println("z0 : $z0")
+        println("pos: $(leaf.data.z_positions[1])")
+        throw(DomainError)
+    end
+    try
+        leaf.data.taus = compute_accumulative_taus(leaf.data.z_positions, leaf.data.densities, z0) 
+    catch
+        println("acc tau failed")
+        println(leaf.data.z_positions)
+        println(point)
+        throw(DomainError)
+    end
     return leaf
 end
 
@@ -248,8 +266,8 @@ function quadtree_effective_density(point1, point2, wind)
 end
 
 function compute_tau_cell(point1, point2, leaf, wind)
-    if point1[2] == point2[2]
-        return 0
+    if isapprox(point1[2], point2[2], rtol=0, atol=1e4*eps(Float64))
+        return 0.0
     end
     try
         @assert point2[2] > point1[2]
@@ -263,16 +281,38 @@ function compute_tau_cell(point1, point2, leaf, wind)
     if length(leaf.data.line_id) == 0
         return wind.grids.n_vacuum * deltad
     end
-    z_idx_1 = get_index(leaf.data.z_positions, point1[2])
-    z_idx_2 = get_index(leaf.data.z_positions, point2[2])
-    deltaz = leaf.data.z_positions[z_idx_2] - leaf.data.z_positions[z_idx_1]
-    if deltaz == 0
-        tau = leaf.data.densities[z_idx_1] * deltad
-        return tau
+    if point1[2] < leaf.data.z_positions[1]
+        z_1 = leaf.boundary.origin[2]
+        den_1 = leaf.data.densities[1]
+        tau_1 = den_1 * (point1[2] - z_1)
+    else
+        z_idx_1 = get_index(leaf.data.z_positions, point1[2])
+        z_1 = leaf.data.z_positions[z_idx_1]
+        den_1 = leaf.data.densities[z_idx_1]
+        tau_1 = leaf.data.taus[z_idx_1] + den_1 * (point1[2] - z_1)
     end
-    deltatau = leaf.data.taus[z_idx_2] - leaf.data.taus[z_idx_1]
+    if point2[2] < leaf.data.z_positions[1]
+        z_2 = leaf.boundary.origin[2]
+        den_2 = leaf.data.densities[1]
+        tau_2 = den_2 * (point2[2] - z_2)
+    else
+        z_idx_2 = get_index(leaf.data.z_positions, point2[2])
+        z_2 = leaf.data.z_positions[z_idx_2]
+        den_2 = leaf.data.densities[z_idx_2]
+        tau_2 = leaf.data.taus[z_idx_2] + den_2 * (point2[2] - z_2)
+    end
+    try
+        @assert point2[2] >= z_2
+    catch
+        println("point2: $point2")
+        println("z_2: $z_2")
+        throw(DomainError)
+    end
+    deltaz = point2[2] - point1[2] 
+    deltatau = tau_2 - tau_1
     @assert deltatau >= 0
     tau = deltatau / deltaz * deltad
+    #println("deltaz $deltaz")
     return tau
 end
 

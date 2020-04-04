@@ -1,0 +1,57 @@
+title = "Qwind test file"
+
+[general]
+save_path = "test_tau.json"
+save_jld2 = "test_tau.jld2"
+verbosity = 0
+
+[bh]
+M = 1e8
+mdot = 0.5
+spin = 0.0
+eta = 0.057
+
+[disk]
+inner_radius = 6.0
+outer_radius = 1200.0
+mu = 1.0
+
+[grids]
+r_min = 0.0
+z_min = 0.0
+r_max = 100.0
+z_max = 10.0
+n_r_disk = 3000
+n_vacuum = 1e2
+tree_initial_divisions = 2
+cell_optical_thickness = 0.1
+minimum_cell_size = 0.1
+
+[radiation]
+f_uv = "auto" 
+f_x = "auto"
+integral_rtol = 1e-3
+analytical_fm = false 
+tau_uv_geometry = "disk"
+disk_uv_fraction = true  
+no_tau_uv = false
+no_tau_uv_z = false 
+tau_uv_include_fm = false
+constant_frad_height = 1
+cak_K = 0.03
+
+[wind]
+initial_radius = 6.0 
+final_radius = 1000.0
+number_streamlines = 20
+iterations = 8
+log_spaced = true 
+wind_temperature = 2.5e4 
+initial_conditions = "manual"
+n_0 = "cak"
+v_0 = "thermal"
+z_0 = 0.0
+solver_rtol = 1e-4
+gravity_only = false 
+nofm = false
+consistent_mdot = false
