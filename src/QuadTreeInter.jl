@@ -91,9 +91,10 @@ function find_neighbour(currentleaf, nextpoint, direction)
 end
 
 function quadtree_initialize(wind)
-    height = wind.config["grids"]["r_max"]
+    height = wind.config["grids"]["z_max"]
+    width = wind.config["grids"]["r_max"]
     wind.quadtree = Cell(SVector(0., 0.), 
-                    SVector(2*height, 2*height),
+                    SVector(2*width, 2*height),
                     CellData(Int[], Float64[], Float64[], Float64[])
                     #[0, Array{Float64}(undef, 2, 0), Float64[], 0] # line_id position density 
                     )
@@ -310,6 +311,7 @@ function compute_tau_cell(point1, point2, leaf, wind)
     end
     deltaz = point2[2] - point1[2] 
     deltatau = tau_2 - tau_1
+    #println("deltaz: $deltaz")
     @assert deltatau >= 0
     tau = deltatau / deltaz * deltad
     #println("deltaz $deltaz")
