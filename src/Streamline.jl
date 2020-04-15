@@ -93,8 +93,7 @@ end
 
 "Residual function of the implict diffeq system"
 function residual!(resid, du, u, line, t)
-    #println("residual")
-    #flush(stdout)
+    flush(stdout)
     r, z, v_r, v_z = u
     #println("residual")
     #println("u : $u")
@@ -196,6 +195,7 @@ function save(u, t, integrator)
     linewidth_normalized = integrator.p.line_width / integrator.p.r_0 
     currentpoint = [r, z]
     previouspoint = [r_0, z_0]
+    println("filling...")
     if z != 0
         quadtree_fill_timestep(previouspoint, currentpoint, n, linewidth_normalized, integrator.p.line_id, integrator, integrator.p.wind)
     end

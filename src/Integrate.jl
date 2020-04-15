@@ -20,7 +20,8 @@ export tau_uv_disk_blob,
        integrate_cuba,
        tau_uv_integrand,
        tau_uv_integral,
-       a
+       a,
+       tausarray
        
        #X_phi, W_phi, X_r, W_r
 using Cubature
@@ -33,6 +34,7 @@ using Cuba
 #const X_r = x
 #const W_r = w
 a=0
+tausarray = []
 
 "Computes the UV optical depth inside a leaf, taking into account the opacity
 boost by the force multiplier."
@@ -55,8 +57,8 @@ Compute the UV optical depth from a disc patch located at (r_d, phi_d),
 until a gas element at (r,z). 
 """
 function tau_uv_disk_blob(r_d, r, z, wind, maxtau)
-    tau_coords_r = Float64[]
-    tau_coords_z = Float64[]
+    #tau_coords_r = Float64[]
+    #tau_coords_z = Float64[]
     r_d > r ? backwards = true : backwards = false
     point1 = [r_d, 0.0]
     point1leaf = findleaf(wind.quadtree, point1)
@@ -259,7 +261,7 @@ function integrate_fromstreamline(r, z, wind::WindStruct; include_tau_uv=true, m
     r_max = wind.config["disk"]["outer_radius"]
     xmin = (0., 0.)
     #xmax = (r+r_max, pi)
-    xmax = (min(max(10, z * 100), 1000), pi)
+    xmax = (r+r_max, pi)#(min(max(10, z * 100), 1000), pi)
     if include_tau_uv
         (val, err) = hcubature(2, 
             (x,v) ->integrate_fromstreamline_kernel(v, x[1], x[2], r, z, wind, r_max, rgsigma, maxtau),

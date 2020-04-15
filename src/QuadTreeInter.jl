@@ -94,7 +94,7 @@ function quadtree_initialize(wind)
     height = wind.config["grids"]["z_max"]
     width = wind.config["grids"]["r_max"]
     wind.quadtree = Cell(SVector(0., 0.), 
-                    SVector(2*width, 2*height),
+                    SVector(width, height),
                     CellData(Int[], Float64[], Float64[], Float64[])
                     #[0, Array{Float64}(undef, 2, 0), Float64[], 0] # line_id position density 
                     )
@@ -179,7 +179,7 @@ function quadtree_fill_timestep(point1, point2, density, linewidthnorm, line_id,
     if point1 == point2 
         return nothing
     end
-    if r2 > wind.config["grids"]["r_max"] || z2 > wind.config["grids"]["z_max"]
+    if r2 > wind.r_max || z2 > wind.z_max
         return nothing
     end
     if z2 < z1
@@ -197,7 +197,7 @@ function quadtree_fill_timestep(point1, point2, density, linewidthnorm, line_id,
     while true
         rleft = currentpoint[1] * (1 - linewidthnorm/2)
         rright = currentpoint[1] * (1 + linewidthnorm/2)
-        quadtree_fill_horizontal(rleft, rright, currentpoint[2], zstep, density, line_id, line, wind, true)
+        quadtree_fill_horizontal(rleft, rright, currentpoint[2], currentleaf, zstep, density, line_id, line, wind, true)
         currentleaf = findleaf(wind.quadtree, currentpoint)
         currentpoint = compute_cell_intersection(currentpoint, currentleaf, point1, point2)
         #backwards && (currentpoint[1] -= 1e-8)
@@ -209,19 +209,21 @@ function quadtree_fill_timestep(point1, point2, density, linewidthnorm, line_id,
     end
     rleft = point2[1] * (1 - linewidthnorm/2)
     rright = point2[1] * (1 + linewidthnorm/2)
-    quadtree_fill_horizontal(rleft, rright, point2[2], zstep, density, line_id, line, wind, true)
+    quadtree_fill_horizontal(rleft, rright, point2[2], currentleaf, zstep, density, line_id, line, wind, true)
 end
 
-function quadtree_fill_horizontal(rleft, rright, z, zstep, density, line_id, line, wind, needs_refinement=true)
+function quadtree_fill_horizontal(rleft, rright, z, leaf, zstep, density, line_id, line, wind, needs_refinement=true)
     rl = [rleft, z]
     rr = [rright, z]
     currentpoint = rl
+    previousleaf = copy(leaf)
     while true
         leaf = quadtree_fill_point(currentpoint, zstep, density, line_id, line, wind, needs_refinement=needs_refinement)
         currentpoint = compute_cell_intersection(currentpoint, leaf, rl, rr)
-        if currentpoint[1] > rright
+        if currentpoint[1] > min(rright, wind.r_max) || previousleaf == leaf
             break
         end
+        previousleaf = copy(leaf)
     end
 end
 

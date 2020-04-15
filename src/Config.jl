@@ -96,7 +96,7 @@ function initialize_quadtree(config::Dict, bh::BlackHoleStruct, grids::GridsStru
     #                [grids.n_vacuum * quadtree_max_height, quadtree_max_height] # density, fm , cell optical thickness, lines that pass through this cell
     #                )
     quadtree = Cell(SVector(0., 0.), 
-                    SVector(2 * quadtree_max_radius, 2* quadtree_max_height),
+                    SVector(quadtree_max_radius, quadtree_max_height),
                     CellData(Int64[], Float64[], Float64[], Float64[])
                     #[0, Array{Float64}(undef, 2, 0), Float64[]] # line_id position density 
                     )
@@ -141,8 +141,8 @@ function initialize_wind(config::Dict, bh::BlackHoleStruct, sed::PyObject, grids
                       lines_range,
                       lines_widths,
                       z_0,
-                      2 * config["grids"]["r_max"],
-                      2 * config["grids"]["z_max"],
+                      config["grids"]["r_max"],
+                      config["grids"]["z_max"],
                       )
     return wind
 end

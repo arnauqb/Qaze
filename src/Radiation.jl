@@ -175,6 +175,7 @@ function compute_tau_x(r, z, wind::WindStruct)
         if currentleaf == previousleaf
             break
         end
+        previousleaf = copy(currentleaf)
     end
     if currentpoint[2] < point2[2]
         taux += compute_taux_leaf(currentpoint, point2, taux, currentleaf, wind)
@@ -277,7 +278,7 @@ function force_radiation(r, z, fm, wind::WindStruct ; include_tau_uv = false)
     end
     #if (z < wind.config["radiation"]["constant_frad_height"])
     #if (z < 1e-3 * r)
-    if z <= 200 #z < 0.01#(r > 100) && (z < 10) || (z < 0.1)
+    if z <= 1 #|| (z<= 100 && r <= 200) #z < 0.01#(r > 100) && (z < 10) || (z < 0.1)
         #if include_tau_uv
         #    density = findleaf(wind.quadtree, [r, 0.]).data[1]
         #    abs_uv = exp(-z * wind.bh.R_g * SIGMA_T * density)
@@ -287,24 +288,26 @@ function force_radiation(r, z, fm, wind::WindStruct ; include_tau_uv = false)
         #return [0.0, force_radiation(r, wind.config["radiation"]["constant_frad_height"], fm, wind, include_tau_uv = false)[2] * abs_uv]
         #println("FS r : $r, z: $z")
         #flush(stdout)
-        if z <= 1
-            #@time int_values = integrate_fromstreamline(r, z, wind, include_tau_uv = include_tau_uv, maxevals=600)
-            int_values = integrate_fromstreamline(r, z, wind, include_tau_uv = include_tau_uv, maxevals=600)
-        else
-            #@time int_values = integrate_fromstreamline(r, z, wind, include_tau_uv = include_tau_uv, maxevals=300)
-            int_values = integrate_fromstreamline(r, z, wind, include_tau_uv = include_tau_uv, maxevals=300)
-        end
+        #if z <= 1
+        #    #@time int_values = integrate_fromstreamline(r, z, wind, include_tau_uv = include_tau_uv, maxevals=600)
+        #    int_values = integrate_fromstreamline(r, z, wind, include_tau_uv = include_tau_uv, maxevals=2000) #600
+        #else
+        #    #@time int_values = integrate_fromstreamline(r, z, wind, include_tau_uv = include_tau_uv, maxevals=300)
+        #    int_values = integrate_fromstreamline(r, z, wind, include_tau_uv = include_tau_uv, maxevals=1500) # 300
+        #end
         #println(int_values)
+        @time int_values = integrate_fromstreamline(r, z, wind, include_tau_uv = include_tau_uv, maxevals = 0)
     else
+        @time int_values = integrate(r, z, wind, include_tau_uv = include_tau_uv, maxevals = 0)
         #println("N r : $r, z: $z")
         #flush(stdout)
-        if z > 100.
-            #@time int_values = integrate(r, z, wind, include_tau_uv=include_tau_uv, maxevals=600)
-            int_values = integrate(r, z, wind, include_tau_uv=include_tau_uv, maxevals=600)
-        else
-            #@time int_values = integrate(r, z, wind, include_tau_uv=include_tau_uv, maxevals=1000)
-            int_values = integrate(r, z, wind, include_tau_uv=include_tau_uv, maxevals=1000)
-        end
+        #if z > 100.
+        #    #@time int_values = integrate(r, z, wind, include_tau_uv=include_tau_uv, maxevals=600)
+        #    int_values = integrate(r, z, wind, include_tau_uv=include_tau_uv, maxevals=2000) #600
+        #else
+        #    #@time int_values = integrate(r, z, wind, include_tau_uv=include_tau_uv, maxevals=1000)
+        #    int_values = integrate(r, z, wind, include_tau_uv=include_tau_uv, maxevals=3000) # 1000
+        #end
         #int_values = integrate_parallel(r, z, wind, include_tau_uv=include_tau_uv)
         #println(int_values)
         if !all(isfinite.(int_values))
