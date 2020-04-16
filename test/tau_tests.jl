@@ -101,33 +101,33 @@ function tau_densityprofile_analytical_simple(rd, r, z, n0, z0)
     return term1 * term2
 end
 
-#@testset "Test constant density grid" begin
-#    density = 1e8
-#    wind.config["grids"]["r_max"] = 256.0
-#    wind.config["grids"]["z_max"] = 256.0
-#    fill_constant_density_grid(wind, density)
-#    sigmarg = wind.bh.R_g * SIGMA_T
-#    r_d_range = range(0, 100, length=50)
-#    r_range = range(0, 250, length=50)
-#    z_range = 10 .^ range(-9, log10(250), length=50)
-#    @showprogress 1 "Computing taus..." for rd in r_d_range
-#        for r in r_range
-#            for z in z_range
-#                tautrue = sqrt((r-rd)^2 + z^2) * sigmarg * density
-#                tau = tau_uv_disk_blob(rd, r, z, wind, Inf) * sigmarg
-#                res = isapprox(tautrue, tau, atol=0, rtol=1e-2)
-#                if !res 
-#                    println("rd: $rd")
-#                    println("r: $r")
-#                    println("z: $z")
-#                    println("tautrue: $tautrue")
-#                    println("tau : $tau")
-#                end
-#                @test res
-#            end
-#        end
-#    end
-#end
+@testset "Test constant density grid" begin
+    density = 1e8
+    wind.config["grids"]["r_max"] = 256.0
+    wind.config["grids"]["z_max"] = 256.0
+    fill_constant_density_grid(wind, density)
+    sigmarg = wind.bh.R_g * SIGMA_T
+    r_d_range = range(0, 100, length=50)
+    r_range = range(0, 250, length=50)
+    z_range = 10 .^ range(-9, log10(250), length=50)
+    @showprogress 1 "Computing taus..." for rd in r_d_range
+        for r in r_range
+            for z in z_range
+                tautrue = sqrt((r-rd)^2 + z^2) * sigmarg * density
+                tau = tau_uv_disk_blob(rd, r, z, wind, Inf) * sigmarg
+                res = isapprox(tautrue, tau, atol=0, rtol=1e-2)
+                if !res 
+                    println("rd: $rd")
+                    println("r: $r")
+                    println("z: $z")
+                    println("tautrue: $tautrue")
+                    println("tau : $tau")
+                end
+                @test res
+            end
+        end
+    end
+end
 
 @testset "Test simple profile density grid" begin
     n0 = 1e8
@@ -143,7 +143,7 @@ end
     @showprogress 1 "Computing taus..." for rd in r_d_range
         for r in r_range
             for z in z_range
-                tautrue = tau_densityprofile_analytical_simple(rd, r, z, n0, r0, z0) 
+                tautrue = tau_densityprofile_analytical_simple(rd, r, z, n0, z0) 
                 tau = 0.
                 try
                     tau = tau_uv_disk_blob(rd, r, z, wind, Inf)
@@ -167,24 +167,3 @@ end
     end
 end
 
-
-#@testset "Test profile density grid" begin
-#    n0 = 1e8
-#    r0 = 10
-#    z0 = 1
-#    fill_densityprofile_grid(wind, n0, r0, z0)
-#    sigmarg = wind.bh.R_g * SIGMA_T
-#    r_d_range = range(0, 100, length=50)
-#    r_range = range(0, 250, length=50)
-#    z_range = 10 .^ range(-9, log10(250), length=50)
-#    @showprogress 1 "Computing taus..." for rd in r_d_range
-#        for r in r_range
-#            for z in z_range
-#                density = density_profile(r, z, n0, r0, z0)
-#                tautrue = sqrt((r-rd)^2 + z^2) * sigmarg * density
-#                tau = tau_uv_disk_blob(rd, r, z, wind, Inf) * sigmarg
-#                @test isapprox(tautrue, tau, atol=0, rtol=1e-2)
-#            end
-#        end
-#    end
-#end
