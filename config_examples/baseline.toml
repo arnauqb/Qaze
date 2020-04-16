@@ -1,8 +1,8 @@
 title = "Qwind config file"
 
 [general]
-save_path = "cell01.json"
-save_jld2 = "cell01.jld2"
+save_path = "slow.json"
+save_jld2 = "slow.jld2"
 verbosity = 0
 
 [bh]

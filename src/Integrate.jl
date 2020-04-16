@@ -261,7 +261,8 @@ function integrate_fromstreamline(r, z, wind::WindStruct; include_tau_uv=true, m
     r_max = wind.config["disk"]["outer_radius"]
     xmin = (0., 0.)
     #xmax = (r+r_max, pi)
-    xmax = (r+r_max, pi)#(min(max(10, z * 100), 1000), pi)
+    #xmax = (r+r_max, pi)#
+    xmax = (500,pi)#(min(max(10, z * 100), 1000), pi)
     if include_tau_uv
         (val, err) = hcubature(2, 
             (x,v) ->integrate_fromstreamline_kernel(v, x[1], x[2], r, z, wind, r_max, rgsigma, maxtau),

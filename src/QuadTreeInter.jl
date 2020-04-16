@@ -151,9 +151,9 @@ function quadtree_fill_point(point, zstep, density, line_id, line, wind; needs_r
     push!(leaf.data.z_positions, point[2])
     push!(leaf.data.densities, density)
     sorting_idx = sortperm(leaf.data.z_positions)
-    leaf.data.line_id = leaf.data.line_id[sorting_idx]
-    leaf.data.z_positions = leaf.data.z_positions[sorting_idx]
-    leaf.data.densities = leaf.data.densities[sorting_idx]
+    leaf.data.line_id .= leaf.data.line_id[sorting_idx]
+    leaf.data.z_positions .= leaf.data.z_positions[sorting_idx]
+    leaf.data.densities .= leaf.data.densities[sorting_idx]
     try
         @assert z0 <= leaf.data.z_positions[1]
     catch
@@ -163,7 +163,8 @@ function quadtree_fill_point(point, zstep, density, line_id, line, wind; needs_r
         throw(DomainError)
     end
     try
-        leaf.data.taus = compute_accumulative_taus(leaf.data.z_positions, leaf.data.densities, z0) 
+        push!(leaf.data.taus, 0.0)
+        leaf.data.taus .= compute_accumulative_taus(leaf.data.z_positions, leaf.data.densities, z0) 
     catch
         println("acc tau failed")
         println(leaf.data.z_positions)
@@ -192,11 +193,15 @@ function quadtree_fill_timestep(point1, point2, density, linewidthnorm, line_id,
     currentleaf = findleaf(wind.quadtree, point1)
     previousleaf = copy(currentleaf)
     currentpoint = copy(point1)
+    deltatau = 0.1 / (density * wind.bh.R_g * SIGMA_T)
     height = abs(point2[2] - point1[2])#point1[2] / 100 
-    zstep = min(max(height, wind.config["grids"]["minimum_cell_size"]), linewidthnorm * point1[1] / 2.0)
+    linewidth_minsize = linewidthnorm * point1[1] / 2.0
+    #println("deltatau : $deltatau")
+    #println("linewidth_minsize $linewidth_minsize")
+    zstep = min(max(deltatau, wind.config["grids"]["minimum_cell_size"]), linewidth_minsize)
     while true
-        rleft = currentpoint[1] * (1 - linewidthnorm/2)
-        rright = currentpoint[1] * (1 + linewidthnorm/2)
+        rleft = currentpoint[1] * (1.0 - linewidthnorm/2.0)
+        rright = currentpoint[1] * (1.0 + linewidthnorm/2.0)
         quadtree_fill_horizontal(rleft, rright, currentpoint[2], currentleaf, zstep, density, line_id, line, wind, true)
         currentleaf = findleaf(wind.quadtree, currentpoint)
         currentpoint = compute_cell_intersection(currentpoint, currentleaf, point1, point2)
@@ -207,8 +212,8 @@ function quadtree_fill_timestep(point1, point2, density, linewidthnorm, line_id,
         end
         previousleaf = currentleaf
     end
-    rleft = point2[1] * (1 - linewidthnorm/2)
-    rright = point2[1] * (1 + linewidthnorm/2)
+    rleft = point2[1] * (1.0 - linewidthnorm/2)
+    rright = point2[1] * (1.0 + linewidthnorm/2)
     quadtree_fill_horizontal(rleft, rright, point2[2], currentleaf, zstep, density, line_id, line, wind, true)
 end
 

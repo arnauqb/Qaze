@@ -97,7 +97,7 @@ mutable struct StreamlineStruct
     a_z_hist::Array{Float64,1}
 end
 
-mutable struct CellData
+struct CellData
     line_id::Array{Int,1}
     z_positions::Array{Float64, 1}
     densities::Array{Float64, 1}
