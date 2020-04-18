@@ -296,9 +296,17 @@ function force_radiation(r, z, fm, wind::WindStruct ; include_tau_uv = false)
         #    int_values = integrate_fromstreamline(r, z, wind, include_tau_uv = include_tau_uv, maxevals=1500) # 300
         #end
         #println(int_values)
-        int_values = integrate_fromstreamline(r, z, wind, include_tau_uv = include_tau_uv, maxevals = 300)
+        if include_tau_uv
+            @time int_values = integrate_fromstreamline(r, z, wind, include_tau_uv=include_tau_uv, maxevals=2000)
+        else
+            @time int_values = integrate_fromstreamline(r, z, wind, include_tau_uv=include_tau_uv, maxevals=0)
+        end
     else
-        int_values = integrate(r, z, wind, include_tau_uv = include_tau_uv, maxevals = 0)
+        if include_tau_uv
+            @time int_values = integrate(r, z, wind, include_tau_uv=include_tau_uv, maxevals=2000)
+        else
+            @time int_values = integrate(r, z, wind, include_tau_uv=include_tau_uv, maxevals=0)
+        end
         #println("N r : $r, z: $z")
         #flush(stdout)
         #if z > 100.

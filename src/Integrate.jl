@@ -269,7 +269,7 @@ function integrate_fromstreamline(r, z, wind::WindStruct; include_tau_uv=true, m
             xmin,
             xmax,
             reltol = wind.config["radiation"]["integral_rtol"],
-            abstol= 0,#abs(maximum(grav)/100),
+            abstol= 0, #abs(maximum(grav)/100),
             maxevals=maxevals,
         )
     else

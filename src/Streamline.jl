@@ -1,5 +1,5 @@
 export compute_density, initialize_line, compute_initial_acceleration, residual!,
-condition, affect, save, solve_line!
+condition, affect!, save, solve_line!, is_stalled
 using DifferentialEquations
 using Sundials
 using Statistics
@@ -52,12 +52,14 @@ function initialize_line!(line_id, r_0, z_0, v_0, n_0, v_th, wind::WindStruct)
                             [a_r_0],
                             [a_z_0])
     tspan = (0., 1e8)
-    termination_cb = DiscreteCallback(condition, affect, save_positions=(false, false))
+    termination_cb = DiscreteCallback(condition, affect!, save_positions=(false, false))
+    stalling_cb = DiscreteCallback(is_stalled, stalling_affect!, save_positions=(false, false))
     saved_values_type = SavedValues(Float64, Array{Float64,1})
     saving_cb = SavingCallback(save, saved_values_type)
     steadystate_cb = TerminateSteadyState(1e-8, 1e-6) 
     #cb = CallbackSet(termination_cb, saving_cb, steadystate_cb)
     #cbtol = AutoAbstol(init_curmax=0.0)
+    #cb = CallbackSet(termination_cb, saving_cb, stalling_cb)
     cb = CallbackSet(termination_cb, saving_cb)
     problem = DAEProblem(residual!, du0, u0, tspan, p=line, differential_vars=[true, true, true, true], init_all=true)
     integrator = init(problem, IDA(), callback=cb)#, dtmax=5e-2 * wind.bh.R_g / C)
@@ -138,6 +140,11 @@ function condition(u, t, integrator)
     v_esc = sqrt(2. / d)
     v_T > v_esc && (integrator.p.escaped=true)
     crossing_condition = false
+    #if is_stalled(integrator)
+    #    println("stalling...")
+    #    integrator.u[2] += 1e5 * integrator.u[2]
+    #end
+    #for i in range(0,10):
     #if (r < integrator.p.r_0) && (z < 0.2 * maximum(integrator.p.u_hist[:,2]))
     #    crossing_condition = true
     #end
@@ -147,7 +154,7 @@ function condition(u, t, integrator)
     #        crossing_condition = true
     #    end
     #end
-
+    
     stalling_condition = compute_stalling_condition(integrator, 5000)
     #if (z < 0.2 * maximum(integrator.p.u_hist[:,2])) && (length(integrator.p.u_hist) > 500) || (length(integrator.p.u_hist) > 5000 )
     #    stalling_condition = true
@@ -159,7 +166,13 @@ function condition(u, t, integrator)
     return cond
 end
 
-function affect(integrator)
+function stalling_affect!(integrator)
+    println("STALLING!")
+    integrator.u[2] += sign(integrator.u[4]) * 5e-2 * integrator.u[2]
+    integrator.u[1] += sign(integrator.u[3]) * 5e-2 * integrator.u[1]
+end
+
+function affect!(integrator)
     if integrator.p.escaped
         print(" \U1F4A8")
     elseif integrator.p.outofdomain
@@ -197,8 +210,9 @@ function save(u, t, integrator)
     previouspoint = [r_0, z_0]
     println("filling...")
     if z != 0
-        quadtree_fill_timestep(previouspoint, currentpoint, n, linewidth_normalized, integrator.p.line_id, integrator, integrator.p.wind)
+        @time quadtree_fill_timestep(previouspoint, currentpoint, n, linewidth_normalized, integrator.p.line_id, integrator, integrator.p.wind)
     end
+    println("-----")
     #println("filling ")
     #fill_and_refine!(previouspoint, currentpoint, linewidth_normalized, n_previous, fm, integrator.p.line_id, integrator.p.wind)
     #if length(integrator.p.n_hist) > 1
@@ -234,4 +248,19 @@ function compute_stalling_condition(line, threshold = 50)
     else
         return false
     end
+end
+
+function is_stalled(u, t, integrator)
+    threshold = 50
+    rtol = 1e-2
+    if length(integrator.p.u_hist[:,1]) <= threshold
+        return false
+    end
+    ret = true
+    for i in 1:threshold
+        if !isapprox(integrator.p.u_hist[end, 2], integrator.p.u_hist[end-i, 2], atol=0, rtol=rtol)
+            ret = false
+        end
+    end
+    return ret
 end
