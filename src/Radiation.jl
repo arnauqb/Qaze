@@ -286,7 +286,6 @@ function force_radiation(r, z, fm, wind::WindStruct ; include_tau_uv = false)
         #    abs_uv = 1.0
         #end
         #return [0.0, force_radiation(r, wind.config["radiation"]["constant_frad_height"], fm, wind, include_tau_uv = false)[2] * abs_uv]
-        #println("FS r : $r, z: $z")
         #flush(stdout)
         #if z <= 1
         #    #@time int_values = integrate_fromstreamline(r, z, wind, include_tau_uv = include_tau_uv, maxevals=600)
@@ -296,19 +295,23 @@ function force_radiation(r, z, fm, wind::WindStruct ; include_tau_uv = false)
         #    int_values = integrate_fromstreamline(r, z, wind, include_tau_uv = include_tau_uv, maxevals=1500) # 300
         #end
         #println(int_values)
+        println("FS r : $r, z: $z")
         if include_tau_uv
-            @time int_values = integrate_fromstreamline(r, z, wind, include_tau_uv=include_tau_uv, maxevals=2000)
-        else
             @time int_values = integrate_fromstreamline(r, z, wind, include_tau_uv=include_tau_uv, maxevals=0)
+        else
+            @time int_values = integrate_fromstreamline(r, z, wind, include_tau_uv=include_tau_uv, maxevals=100000)
         end
+        println(int_values)
+        flush(stdout)
     else
+        println("N r : $r, z: $z")
         if include_tau_uv
-            @time int_values = integrate(r, z, wind, include_tau_uv=include_tau_uv, maxevals=2000)
+            @time int_values = integrate(r, z, wind, include_tau_uv=include_tau_uv, maxevals=100000)
         else
             @time int_values = integrate(r, z, wind, include_tau_uv=include_tau_uv, maxevals=0)
         end
-        #println("N r : $r, z: $z")
-        #flush(stdout)
+        println(int_values)
+        flush(stdout)
         #if z > 100.
         #    #@time int_values = integrate(r, z, wind, include_tau_uv=include_tau_uv, maxevals=600)
         #    int_values = integrate(r, z, wind, include_tau_uv=include_tau_uv, maxevals=2000) #600

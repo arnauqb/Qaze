@@ -129,7 +129,7 @@ function integrate_notau_kernel(v, r_d, phi_d, r, z, wind)
     v[2] = aux
 end
 
-function integrate(r, z, wind::WindStruct; include_tau_uv=true, maxevals = 500)
+function integrate(r, z, wind::WindStruct; include_tau_uv=true, maxevals = 0)
     global a = 0
     rgsigma = wind.bh.R_g * SIGMA_T
     maxtau = 20 / rgsigma
@@ -143,6 +143,7 @@ function integrate(r, z, wind::WindStruct; include_tau_uv=true, maxevals = 500)
                 reltol = wind.config["radiation"]["integral_rtol"],
                 abstol=0, #minimum(abs.(grav))/100,
                 maxevals=maxevals,
+                error_norm=Cubature.L1
                 )
     else
         (val, err) = hcubature(2, 
@@ -151,7 +152,8 @@ function integrate(r, z, wind::WindStruct; include_tau_uv=true, maxevals = 500)
                 xmax,
                 reltol = wind.config["radiation"]["integral_rtol"],
                 abstol=0,
-                maxevals=maxevals
+                maxevals=maxevals,
+                error_norm=Cubature.L1
                 )
     end
     val .*= [2 * z, 2 * z^2]
@@ -255,7 +257,7 @@ function integrate_fromstreamline_kernel(v, p, psi, r, z, wind, r_max, rgsigma, 
     v[2] = common_part
 end
 
-function integrate_fromstreamline(r, z, wind::WindStruct; include_tau_uv=true, maxevals=3000)
+function integrate_fromstreamline(r, z, wind::WindStruct; include_tau_uv=true, maxevals=0)
     rgsigma = wind.bh.R_g * SIGMA_T
     maxtau = 20 /rgsigma
     r_max = wind.config["disk"]["outer_radius"]
@@ -271,6 +273,7 @@ function integrate_fromstreamline(r, z, wind::WindStruct; include_tau_uv=true, m
             reltol = wind.config["radiation"]["integral_rtol"],
             abstol= 0, #abs(maximum(grav)/100),
             maxevals=maxevals,
+            error_norm=Cubature.L1,
         )
     else
         (val, err) = hcubature(2, 
@@ -280,6 +283,7 @@ function integrate_fromstreamline(r, z, wind::WindStruct; include_tau_uv=true, m
             reltol = wind.config["radiation"]["integral_rtol"],
             abstol=0.0,
             maxevals=maxevals,
+            error_norm=Cubature.L1,
         )
     end
     return [2*z, 2*z^2] .* val
