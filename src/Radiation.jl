@@ -306,7 +306,7 @@ function force_radiation(r, z, fm, wind::WindStruct ; include_tau_uv = false)
     else
         println("N r : $r, z: $z")
         if include_tau_uv
-            @time int_values = integrate(r, z, wind, include_tau_uv=include_tau_uv, maxevals=100000)
+            @time int_values = integrate(r, z, wind, include_tau_uv=include_tau_uv, maxevals=1000)
         else
             @time int_values = integrate(r, z, wind, include_tau_uv=include_tau_uv, maxevals=0)
         end

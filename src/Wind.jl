@@ -98,12 +98,12 @@ function start_iteration!(it_num, wind::WindStruct, from_line = 1, until_line=no
     @save wind.config["general"]["save_jld2"] qt
 end
 
-function start_lines!(wind::WindStruct, until_line = nothing)
+function start_lines!(wind::WindStruct ; from_iter=1, from_line=1, until_line=nothing)
     #wind.radiation.include_tauuv = true#false 
-    for it_num in 1:wind.config["wind"]["iterations"]
+    for it_num in from_iter:wind.config["wind"]["iterations"]
         @printf("Iteration %02d of %02d\n", it_num, wind.config["wind"]["iterations"])
         flush(stdout)
-        start_iteration!(it_num, wind, 1, until_line)
+        start_iteration!(it_num, wind, from_line, until_line)
         #refine_all(wind)
     end
 end
